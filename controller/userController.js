@@ -5,27 +5,52 @@ const crypto = require('crypto');
 exports.registerUser = async (req, res) => {
   try {
     const { telegramUserId, username, referralCode } = req.body;
-    let referredBy;
+    let referredBy = null;
+    let referralLevels = [];
+
     if (referralCode) {
-      referredBy = await User.findOne({ referralCode });
+      referredBy = await User.findOne({ username: referralCode });
       if (!referredBy) {
         return res.status(400).json({ message: 'Invalid referral code' });
       }
+      referralLevels.push(referredBy);
     }
-    const newReferralCode = crypto.randomBytes(6).toString('hex');
-    const user = new User({ 
-      telegramUserId, 
-      username, 
-      referralCode: newReferralCode,
-      referredBy: referredBy ? referredBy._id : null
+
+    // Creating the new user
+    const user = new User({
+      telegramUserId,
+      username,
+      referredBy: referredBy ? referredBy._id : null,
     });
     await user.save();
 
     if (referredBy) {
+      // Update the first-level referrer
       referredBy.referrals.push(user._id);
+      referredBy.addEarnings(15000); // First level referral bonus
       await referredBy.save();
-      // Add referral points logic here
+
+      // Calculate referral bonuses up to 5 levels
+      const referralBonuses = [0.20, 0.10, 0.05, 0.025, 0.0125];
+      let currentReferrer = referredBy;
+
+      for (let i = 0; i < referralBonuses.length; i++) {
+        if (currentReferrer) {
+          const bonusAmount = 30000 * referralBonuses[i];
+          currentReferrer.addEarnings(bonusAmount);
+          await currentReferrer.save();
+
+          // Move to the next level referrer
+          currentReferrer = await User.findById(currentReferrer.referredBy);
+        } else {
+          break;
+        }
+      }
     }
+
+    // Adding bonus for the new user
+    user.addEarnings(30000); // New user bonus
+    await user.save();
 
     res.status(201).json(user);
   } catch (error) {
