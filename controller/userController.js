@@ -57,17 +57,19 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
 exports.getUserReferrals = async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Ensure the userId is an ObjectId
+    // Ensure the userId is a valid ObjectId
     if (!ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    const user = await User.findById(userId).populate('referrals', 'username');
+    // Convert the userId string to an ObjectId
+    const objectId = new ObjectId(userId);
+
+    const user = await User.findById(objectId).populate('referrals', 'username');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
