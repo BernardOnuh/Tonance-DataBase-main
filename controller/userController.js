@@ -6,28 +6,26 @@ exports.registerUser = async (req, res) => {
   try {
     const { telegramUserId, username, referralCode } = req.body;
     let referredBy = null;
-    let referralLevels = [];
 
     if (referralCode) {
       referredBy = await User.findOne({ username: referralCode });
       if (!referredBy) {
         return res.status(400).json({ message: 'Invalid referral code' });
       }
-      referralLevels.push(referredBy);
     }
 
     // Creating the new user
     const user = new User({
       telegramUserId,
       username,
-      referredBy: referredBy ? referredBy._id : null,
+      referredBy: referredBy ? referredBy._id : null,  // Store the ObjectId reference
     });
     await user.save();
 
     if (referredBy) {
       // Update the first-level referrer
-      referredBy.referrals.push(user._id);
-      referredBy.addEarnings(15000); // First level referral bonus
+      referredBy.referrals.push(user._id);  // Store ObjectId in referrals array
+      referredBy.addEarnings(15000);  // First level referral bonus
       await referredBy.save();
 
       // Calculate referral bonuses up to 5 levels
@@ -49,7 +47,7 @@ exports.registerUser = async (req, res) => {
     }
 
     // Adding bonus for the new user
-    user.addEarnings(30000); // New user bonus
+    user.addEarnings(30000);  // New user bonus
     await user.save();
 
     res.status(201).json(user);
@@ -57,6 +55,7 @@ exports.registerUser = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
 
 exports.getUserReferrals = async (req, res) => {
   try {
