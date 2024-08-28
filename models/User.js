@@ -50,9 +50,14 @@ const UserSchema = new mongoose.Schema({
   lastActive: {
     type: Date,
     default: Date.now
+  },
+  claimStreak: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 
+// Method to update user role based on referral count
 UserSchema.methods.updateRole = function() {
   const referralCount = this.referrals.length;
   if (referralCount >= 5001) {
@@ -66,6 +71,7 @@ UserSchema.methods.updateRole = function() {
   }
 };
 
+// Method to add a referral and update the user's role
 UserSchema.methods.addReferral = function(username) {
   if (!this.referrals.includes(username)) {
     this.referrals.push(username);
@@ -73,16 +79,19 @@ UserSchema.methods.addReferral = function(username) {
   }
 };
 
+// Method to add earnings to the user
 UserSchema.methods.addEarnings = function(amount) {
   this.balance += amount;
   this.totalEarnings += amount;
 };
 
+// Method to check if the user can claim points
 UserSchema.methods.canClaim = function() {
   const hoursSinceLastClaim = (Date.now() - this.lastClaimTime) / (1000 * 60 * 60);
   return hoursSinceLastClaim >= 1;
 };
 
+// Method to handle the claiming of points by the user
 UserSchema.methods.claim = function() {
   const now = new Date();
   const hoursSinceLastClaim = (now - this.lastClaimTime) / (1000 * 60 * 60);
