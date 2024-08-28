@@ -18,6 +18,7 @@ router.post('/complete-task', taskController.completeTask);
 // User routes
 router.post('/register', userController.registerUser);
 router.get('/referrals/:userId', userController.getUserReferrals);
+router.get('/user/:telegramUserId', userController.getUserDetails);
 
 // Leaderboard routes
 router.get('/leaderboard', leaderboardController.getLeaderboard);

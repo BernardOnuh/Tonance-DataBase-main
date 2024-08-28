@@ -45,3 +45,27 @@ exports.getUserReferrals = async (req, res) => {
   }
 };
 
+exports.getUserDetails = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params; // Assuming you're fetching details by telegramUserId
+    const user = await User.findOne({ telegramUserId }).populate('referrals', 'username');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      telegramUserId: user.telegramUserId,
+      username: user.username,
+      balance: user.balance,
+      claimStreak: user.claimStreak,
+      lastClaimTime: user.lastClaimTime,
+      referralCode: user.referralCode,
+      referredBy: user.referredBy,
+      referrals: user.referrals.map(ref => ref.username),
+      // Include any other fields you need here
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
