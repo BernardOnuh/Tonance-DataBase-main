@@ -45,29 +45,28 @@ exports.claimHourlyPoints = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Allow first-time claim without waiting
-    if (!user.lastClaimTime || user.canClaim()) {
-      const claimedAmount = user.claim();
-      await user.save();
-
-      return res.json({
-        message: 'Points claimed successfully',
-        claimedAmount,
-        newBalance: user.balance,
-        claimStreak: user.claimStreak
+    if (!user.canClaim()) {
+      const secondsToNextClaim = Math.ceil((60 * 60) - ((Date.now() - user.lastClaimTime) / 1000));
+      return res.status(400).json({ 
+        message: 'You can\'t claim yet', 
+        secondsToNextClaim 
       });
     }
 
-    // Calculate the time until the next claim
-    const minutesToNextClaim = 60 - ((Date.now() - user.lastClaimTime) / (1000 * 60));
-    return res.status(400).json({ 
-      message: 'You can\'t claim yet', 
-      minutesToNextClaim: Math.ceil(minutesToNextClaim),
-      secondsToNextClaim: Math.ceil((minutesToNextClaim * 60))  // Show seconds as well
+    const claimedAmount = user.claim();
+    await user.save();
+
+    res.json({
+      message: 'Points claimed successfully',
+      claimedAmount,
+      newBalance: user.balance,
+      claimStreak: user.claimStreak,
+      secondsToNextClaim: 3600 // 1 hour until the next claim
     });
 
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
+
 

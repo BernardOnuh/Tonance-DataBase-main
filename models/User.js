@@ -1,63 +1,61 @@
-// models/User.js
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
   telegramUserId: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   username: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
   },
   role: {
     type: String,
     enum: ['User', 'Promoter', 'Influencer', 'Ambassador'],
-    default: 'User'
+    default: 'User',
   },
   balance: {
     type: Number,
-    default: 0
+    default: 0,
   },
   lastClaimTime: {
     type: Date,
-    default: Date.now
+    default: null, // Changed to null to indicate no claim yet
+  },
+  firstClaim: {
+    type: Boolean,
+    default: false, // Track whether the user has made their first claim
   },
   referredBy: {
-    type: String  // Username of the user who referred this user
+    type: String, // Username of the user who referred this user
   },
   referrals: [{
-    type: String  // Array of usernames referred by this user
+    type: String, // Array of usernames referred by this user
   }],
   joinBonus: {
     type: Number,
-    default: 0
+    default: 0,
   },
   totalEarnings: {
     type: Number,
-    default: 0
+    default: 0,
   },
   tasksCompleted: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Task'
+    ref: 'Task',
   }],
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   lastActive: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
-  claimStreak: {
-    type: Number,
-    default: 0
-  }
 }, { timestamps: true });
 
-// Method to update user role based on referral count
 UserSchema.methods.updateRole = function() {
   const referralCount = this.referrals.length;
   if (referralCount >= 5001) {
@@ -71,7 +69,6 @@ UserSchema.methods.updateRole = function() {
   }
 };
 
-// Method to add a referral and update the user's role
 UserSchema.methods.addReferral = function(username) {
   if (!this.referrals.includes(username)) {
     this.referrals.push(username);
@@ -79,26 +76,26 @@ UserSchema.methods.addReferral = function(username) {
   }
 };
 
-// Method to add earnings to the user
 UserSchema.methods.addEarnings = function(amount) {
   this.balance += amount;
   this.totalEarnings += amount;
 };
 
-// Method to check if the user can claim points
 UserSchema.methods.canClaim = function() {
+  if (!this.firstClaim) {
+    return true; // Allow first claim
+  }
   const hoursSinceLastClaim = (Date.now() - this.lastClaimTime) / (1000 * 60 * 60);
   return hoursSinceLastClaim >= 1;
 };
 
-// Method to handle the claiming of points by the user
 UserSchema.methods.claim = function() {
   const now = new Date();
   const hoursSinceLastClaim = (now - this.lastClaimTime) / (1000 * 60 * 60);
 
   let claimAmount = 10; // Base claim amount
 
-  if (hoursSinceLastClaim <= 25) { // Within 25 hours to maintain streak
+  if (this.firstClaim && hoursSinceLastClaim <= 25) { // Within 25 hours to maintain streak
     this.claimStreak += 1;
     claimAmount += Math.min(this.claimStreak, 10); // Bonus for streak, max 10 extra points
   } else {
@@ -106,6 +103,7 @@ UserSchema.methods.claim = function() {
   }
 
   this.lastClaimTime = now;
+  this.firstClaim = true; // Set first claim to true after the initial claim
   this.addEarnings(claimAmount);
 
   return claimAmount;
