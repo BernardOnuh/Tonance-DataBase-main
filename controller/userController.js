@@ -45,6 +45,7 @@ exports.getUserReferrals = async (req, res) => {
   }
 };
 
+
 exports.getUserDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params; // Assuming you're fetching details by telegramUserId
@@ -54,12 +55,18 @@ exports.getUserDetails = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const currentTime = Date.now();
+    const timeSinceLastClaim = currentTime - user.lastClaimTime;
+    const claimCooldown = 60 * 60 * 1000; // 1 hour cooldown in milliseconds
+    let secondsUntilNextClaim = Math.max((claimCooldown - timeSinceLastClaim) / 1000, 0);
+
     res.json({
       telegramUserId: user.telegramUserId,
       username: user.username,
       balance: user.balance,
       claimStreak: user.claimStreak,
       lastClaimTime: user.lastClaimTime,
+      secondsUntilNextClaim: Math.ceil(secondsUntilNextClaim), // Round up to nearest second
       referralCode: user.referralCode,
       referredBy: user.referredBy,
       referrals: user.referrals.map(ref => ref.username),
