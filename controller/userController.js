@@ -1,5 +1,6 @@
 // controllers/userController.js
 const User = require('../models/User');
+const ObjectId = mongoose.Types.ObjectId;
 const crypto = require('crypto');
 
 exports.registerUser = async (req, res) => {
@@ -59,10 +60,19 @@ exports.registerUser = async (req, res) => {
 
 exports.getUserReferrals = async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId).populate('referrals', 'username');
+    const userId = req.params.userId;
+
+    // Ensure the userId is an ObjectId
+    if (!ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
+    const user = await User.findById(userId).populate('referrals', 'username');
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.json(user.referrals);
   } catch (error) {
     res.status(400).json({ message: error.message });
