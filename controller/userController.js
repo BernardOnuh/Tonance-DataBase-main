@@ -109,7 +109,7 @@ exports.getUserDetails = async (req, res) => {
 
 exports.completeTask = async (req, res) => {
   try {
-    const { username, taskId } = req.body; // Use username instead of telegramUserId
+    const { username, taskId } = req.body;
 
     // Find the user by username
     const user = await User.findOne({ username });
@@ -133,11 +133,14 @@ exports.completeTask = async (req, res) => {
     // Add the task to the user's completed tasks
     user.tasksCompleted.push(taskId);
 
-    // Remove the task from the pending tasks (if applicable)
-    user.tasks = user.tasks.filter(t => t.toString() !== taskId);
+    // Optional: If you have a `tasks` array, remove the task from pending tasks
+    // (If `tasks` field is meant to track pending tasks, initialize it if necessary)
+    if (user.tasks) {
+      user.tasks = user.tasks.filter(t => t.toString() !== taskId);
+    }
 
-    // Optionally, reward the user for completing the task
-    user.addEarnings(task.points); // Assuming addEarnings is defined in the User schema
+    // Reward the user for completing the task
+    user.addEarnings(task.points);
 
     // Save the updated user document
     await user.save();
