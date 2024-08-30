@@ -72,26 +72,30 @@ exports.getLeaderboard = async (req, res) => {
 exports.getUserRank = async (req, res) => {
   try {
     const { username } = req.params;
+    
+    // Find the specific user by username
     const user = await User.findOne({ username }).populate('referrals', 'username');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get the rank of the user
+    // Fetch all users and sort them by referral count in descending order
     const users = await User.find({})
-      .sort({ 'referrals.length': -1 })
-      .select('username referrals');
+      .populate('referrals', 'username');
+
+    users.sort((a, b) => b.referrals.length - a.referrals.length);
 
     let rank = 0;
     let classification = 'User';
 
-    // Find the rank of the user
-    users.forEach((u, index) => {
-      if (u.username === username) {
-        rank = index + 1;
+    // Find the rank of the specific user
+    for (let i = 0; i < users.length; i++) {
+      if (users[i].username === username) {
+        rank = i + 1;
+        break;
       }
-    });
+    }
 
     // Determine the classification based on rank
     if (rank <= 5000) {
@@ -102,6 +106,7 @@ exports.getUserRank = async (req, res) => {
       classification = 'Ambassador';
     }
 
+    // Return the user's rank, referral count, and classification
     res.json({
       username: user.username,
       referralCount: user.referrals.length,
@@ -112,6 +117,7 @@ exports.getUserRank = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
 
 
 exports.claimHourlyPoints = async (req, res) => {
