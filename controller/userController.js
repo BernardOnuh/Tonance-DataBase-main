@@ -1,9 +1,8 @@
-// controllers/userController.js
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
-const crypto = require('crypto');
 
+// Register a new user
 exports.registerUser = async (req, res) => {
   try {
     const { telegramUserId, username, referralCode } = req.body;
@@ -16,21 +15,18 @@ exports.registerUser = async (req, res) => {
       }
     }
 
-    // Creating the new user
     const user = new User({
       telegramUserId,
       username,
-      referredBy: referredBy ? referredBy._id : null,  // Store the ObjectId reference
+      referredBy: referredBy ? referredBy._id : null,
     });
     await user.save();
 
     if (referredBy) {
-      // Update the first-level referrer
-      referredBy.referrals.push(user._id);  // Store ObjectId in referrals array
-      referredBy.addEarnings(15000);  // First level referral bonus
+      referredBy.referrals.push(user._id);
+      referredBy.addEarnings(15000);
       await referredBy.save();
 
-      // Calculate referral bonuses up to 5 levels
       const referralBonuses = [0.20, 0.10, 0.05, 0.025, 0.0125];
       let currentReferrer = referredBy;
 
@@ -40,7 +36,6 @@ exports.registerUser = async (req, res) => {
           currentReferrer.addEarnings(bonusAmount);
           await currentReferrer.save();
 
-          // Move to the next level referrer
           currentReferrer = await User.findById(currentReferrer.referredBy);
         } else {
           break;
@@ -48,8 +43,7 @@ exports.registerUser = async (req, res) => {
       }
     }
 
-    // Adding bonus for the new user
-    user.addEarnings(30000);  // New user bonus
+    user.addEarnings(30000);
     await user.save();
 
     res.status(201).json(user);
@@ -58,16 +52,15 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+// Get all referrals for a user
 exports.getUserReferrals = async (req, res) => {
   try {
     const userId = req.params.userId;
 
-    // Ensure the userId is a valid ObjectId
     if (!ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    // Convert the userId string to an ObjectId
     const objectId = new ObjectId(userId);
 
     const user = await User.findById(objectId).populate('referrals', 'username');
@@ -82,10 +75,10 @@ exports.getUserReferrals = async (req, res) => {
   }
 };
 
-
+// Get user details by Telegram user ID
 exports.getUserDetails = async (req, res) => {
   try {
-    const { telegramUserId } = req.params; // Assuming you're fetching details by telegramUserId
+    const { telegramUserId } = req.params;
     const user = await User.findOne({ telegramUserId }).populate('referrals', 'username');
 
     if (!user) {
@@ -103,13 +96,36 @@ exports.getUserDetails = async (req, res) => {
       balance: user.balance,
       claimStreak: user.claimStreak,
       lastClaimTime: user.lastClaimTime,
-      secondsUntilNextClaim: Math.ceil(secondsUntilNextClaim), // Round up to nearest second
+      secondsUntilNextClaim: Math.ceil(secondsUntilNextClaim),
       referralCode: user.referralCode,
       referredBy: user.referredBy,
       referrals: user.referrals.map(ref => ref.username),
-      // Include any other fields you need here
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Mark a task as completed for a user
+exports.completeTask = async (req, res) => {
+  try {
+    const { username, taskId } = req.body;
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.tasksCompleted.includes(taskId)) {
+      return res.status(400).json({ message: 'Task already completed' });
+    }
+
+    user.tasksCompleted.push(taskId);
+    await user.save();
+
+    res.json({ message: 'Task marked as completed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
