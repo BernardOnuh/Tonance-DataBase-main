@@ -106,25 +106,42 @@ exports.getUserDetails = async (req, res) => {
   }
 };
 
-// Mark a task as completed for a user
 exports.completeTask = async (req, res) => {
   try {
-    const { username, taskId } = req.body;
+    const { username, taskId } = req.body; // Use username instead of telegramUserId
 
+    // Find the user by username
     const user = await User.findOne({ username });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Find the task by taskId
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Check if the task is already completed by the user
     if (user.tasksCompleted.includes(taskId)) {
       return res.status(400).json({ message: 'Task already completed' });
     }
 
+    // Add the task to the user's completed tasks
     user.tasksCompleted.push(taskId);
+
+    // Remove the task from the pending tasks (if applicable)
+    user.tasks = user.tasks.filter(t => t.toString() !== taskId);
+
+    // Optionally, reward the user for completing the task
+    user.addEarnings(task.points); // Assuming addEarnings is defined in the User schema
+
+    // Save the updated user document
     await user.save();
 
-    res.json({ message: 'Task marked as completed' });
+    res.status(200).json({ message: 'Task completed successfully', user });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
