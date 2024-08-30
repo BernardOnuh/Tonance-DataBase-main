@@ -12,34 +12,55 @@ exports.getLeaderboard = async (req, res) => {
 
     // Fetch users sorted by the number of referrals (in descending order)
     const users = await User.find(query)
-      .sort({ 'referrals.length': -1 })
-      .select('username role referrals')
-      .populate('referrals', 'username');
+      .populate('referrals', 'username')
+      .sort({ 'referrals.length': -1 }) // Sort by the number of referrals
+      .select('username role referrals');
 
-    // Map users to include rank and classification
-    const leaderboardData = users.map((user, index) => {
-      let classification = 'User'; // Default classification
+    // Initialize arrays to hold classified users
+    const promoters = [];
+    const influencers = [];
+    const ambassadors = [];
 
-      // Determine the classification based on rank
+    // Rank users and classify them based on rank
+    users.forEach((user, index) => {
       const rank = index + 1;
+      const referralCount = user.referrals.length;
+
+      let classification = 'User';
+
       if (rank <= 5000) {
         classification = 'Promoter';
+        promoters.push({
+          username: user.username,
+          role: classification,
+          referralCount: referralCount,
+          rank: rank,
+        });
       } else if (rank <= 20000) {
         classification = 'Influencer';
+        influencers.push({
+          username: user.username,
+          role: classification,
+          referralCount: referralCount,
+          rank: rank,
+        });
       } else if (rank <= 50000) {
         classification = 'Ambassador';
+        ambassadors.push({
+          username: user.username,
+          role: classification,
+          referralCount: referralCount,
+          rank: rank,
+        });
       }
-
-      return {
-        username: user.username,
-        role: classification, // Override role based on rank classification
-        referralCount: user.referrals.length,
-        rank: rank,
-      };
     });
 
-    // Return the full leaderboard
-    res.json(leaderboardData);
+    // Return the leaderboard with separate classifications
+    res.json({
+      promoters,
+      influencers,
+      ambassadors
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
