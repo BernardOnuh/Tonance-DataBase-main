@@ -1,53 +1,97 @@
-// controllers/taskController.js
 const Task = require('../models/Task');
 const User = require('../models/User');
-const CompletedTask = require('../models/CompletedTask');
-const Leaderboard = require('../models/Leaderboard');
 
-exports.createTask = async (req, res) => {
+// Get all tasks for a specific user (excluding completed ones)
+exports.getTasksForUser = async (req, res) => {
   try {
-    const { topic, description, imageUrl, points } = req.body;
-    const task = new Task({ topic, description, imageUrl, points });
-    await task.save();
-    res.status(201).json(task);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+    const { username } = req.params;
 
-exports.getTasks = async (req, res) => {
-  try {
-    const tasks = await Task.find({ isActive: true });
-    res.json(tasks);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+    // Find the user by username
+    const user = await User.findOne({ username });
 
-exports.completeTask = async (req, res) => {
-  try {
-    const { userId, taskId } = req.body;
-    const user = await User.findById(userId);
-    const task = await Task.findById(taskId);
-
-    if (!user || !task) {
-      return res.status(404).json({ message: 'User or Task not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const completedTask = new CompletedTask({ userId, taskId });
-    await completedTask.save();
+    // Find tasks that are active and not completed by the user
+    const tasks = await Task.find({
+      isActive: true,
+      _id: { $nin: user.tasksCompleted }, // Exclude tasks that are completed by the user
+    });
 
-    user.balance += task.points;
-    await user.save();
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    await Leaderboard.findOneAndUpdate(
-      { userId: user._id },
-      { $inc: { score: task.points }, role: user.role },
-      { upsert: true, new: true }
-    );
+// Get a specific task by ID
+exports.getTaskById = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const task = await Task.findById(taskId);
 
-    res.json({ message: 'Task completed successfully', newBalance: user.balance });
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Create a new task
+exports.createTask = async (req, res) => {
+  try {
+    const { topic, description, imageUrl, points, expiresAt, completionDelay } = req.body;
+
+    const newTask = new Task({
+      topic,
+      description,
+      imageUrl,
+      points,
+      expiresAt,
+      completionDelay,
+    });
+
+    await newTask.save();
+    res.status(201).json(newTask);
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+};
+
+// Update a task by ID
+exports.updateTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const updates = req.body;
+
+    const updatedTask = await Task.findByIdAndUpdate(taskId, updates, { new: true });
+
+    if (!updatedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json(updatedTask);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Delete a task by ID
+exports.deleteTask = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const deletedTask = await Task.findByIdAndDelete(taskId);
+
+    if (!deletedTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
