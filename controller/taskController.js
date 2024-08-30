@@ -44,7 +44,7 @@ exports.getTaskById = async (req, res) => {
 // Create a new task
 exports.createTask = async (req, res) => {
   try {
-    const { topic, description, imageUrl, points, expiresAt, completionDelay } = req.body;
+    const { topic, description, imageUrl, points, expiresAt, completionDelay, link } = req.body;
 
     const newTask = new Task({
       topic,
@@ -53,6 +53,7 @@ exports.createTask = async (req, res) => {
       points,
       expiresAt,
       completionDelay,
+      link
     });
 
     await newTask.save();
