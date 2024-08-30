@@ -11,14 +11,16 @@ const isOwner = (req, res, next) => {
 };
 
 // Task routes
-router.post('/tasks', isOwner, taskController.createTask);
-router.get('/tasks', taskController.getTasks);
-router.post('/complete-task', taskController.completeTask);
-
+router.get('/tasks/:username', taskController.getTasksForUser); // Get tasks for a specific user
+router.get('/task/:taskId', taskController.getTaskById); // Get a specific task by ID
+router.post('/task', taskController.createTask); // Create a new task
+router.put('/task/:taskId', taskController.updateTask); // Update a task by ID
+router.delete('/task/:taskId', taskController.deleteTask)
 // User routes
 router.post('/register', userController.registerUser);
 router.get('/referrals/:userId', userController.getUserReferrals);
 router.get('/user/:telegramUserId', userController.getUserDetails);
+router.post('/task/complete', userController.completeTask); 
 
 // Leaderboard routes
 router.get('/leaderboard', leaderboardController.getLeaderboard);
