@@ -1,4 +1,3 @@
-// models/Task.js
 const mongoose = require('mongoose');
 
 const TaskSchema = new mongoose.Schema({
@@ -27,6 +26,15 @@ const TaskSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date
+  },
+  completionDelay: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  link: { // New field to store the link to the task
+    type: String,
+    required: true
   }
 });
 
