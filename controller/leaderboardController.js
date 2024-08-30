@@ -10,11 +10,12 @@ exports.getLeaderboard = async (req, res) => {
       query.role = role;
     }
 
-    // Fetch users sorted by the number of referrals (in descending order)
+    // Fetch users and calculate the referral count for sorting
     const users = await User.find(query)
-      .populate('referrals', 'username')
-      .sort({ 'referrals.length': -1 }) // Sort by the number of referrals
-      .select('username role referrals');
+      .populate('referrals', 'username');
+
+    // Sort users by the length of their referrals array in descending order
+    users.sort((a, b) => b.referrals.length - a.referrals.length);
 
     // Initialize arrays to hold classified users
     const promoters = [];
@@ -65,6 +66,7 @@ exports.getLeaderboard = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
 
 
 exports.getUserRank = async (req, res) => {
