@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
+const Task = require('../models/Task');
 
 // Register a new user
 exports.registerUser = async (req, res) => {
