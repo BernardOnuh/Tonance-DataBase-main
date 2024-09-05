@@ -107,6 +107,35 @@ exports.getUserDetails = async (req, res) => {
   }
 };
 
+exports.playGame = async (req, res) => {
+  try {
+    const { username, score } = req.body;
+
+    // Find the user by username
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update the user's game score
+    user.updateGameScore(score);
+
+    // Save the updated user document
+    await user.save();
+
+    res.status(200).json({ 
+      message: 'Game score updated successfully', 
+      newHighScore: user.gameScore === score,
+      currentScore: score,
+      highScore: user.gameScore
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
 exports.completeTask = async (req, res) => {
   try {
     const { username, taskId } = req.body;

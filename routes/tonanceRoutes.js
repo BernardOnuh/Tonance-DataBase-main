@@ -1,4 +1,3 @@
-// routes/tonanceRoutes.js
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controller/taskController');
@@ -11,20 +10,24 @@ const isOwner = (req, res, next) => {
 };
 
 // Task routes
-router.get('/tasks/:username', taskController.getTasksForUser); // Get tasks for a specific user
-router.get('/task/:taskId', taskController.getTaskById); // Get a specific task by ID
-router.post('/task', taskController.createTask); // Create a new task
-router.put('/task/:taskId', taskController.updateTask); // Update a task by ID
-router.delete('/task/:taskId', taskController.deleteTask)
+router.get('/tasks/:username', taskController.getTasksForUser);
+router.get('/task/:taskId', taskController.getTaskById);
+router.post('/task', taskController.createTask);
+router.put('/task/:taskId', taskController.updateTask);
+router.delete('/task/:taskId', taskController.deleteTask);
+
 // User routes
 router.post('/register', userController.registerUser);
 router.get('/referrals/:userId', userController.getUserReferrals);
 router.get('/user/:telegramUserId', userController.getUserDetails);
-router.post('/task/complete', userController.completeTask); 
+router.post('/task/complete', userController.completeTask);
 
 // Leaderboard routes
 router.get('/leaderboard', leaderboardController.getLeaderboard);
 router.get('/rank/:username', leaderboardController.getUserRank);
 router.post('/claim-hourly-points', leaderboardController.claimHourlyPoints);
+
+// New game route
+router.post('/play-game', userController.playGame);
 
 module.exports = router;

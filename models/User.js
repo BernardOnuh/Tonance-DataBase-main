@@ -104,7 +104,7 @@ UserSchema.methods.claim = function() {
   const now = new Date();
   const hoursSinceLastClaim = (now - this.lastClaimTime) / (1000 * 60 * 60);
 
-  let claimAmount = 10;  // Base claim amount
+  let claimAmount = 3600;  // Base claim amount
 
   if (this.firstClaim && hoursSinceLastClaim <= 25) {  // Maintain streak if within 25 hours
     this.claimStreak += 1;
