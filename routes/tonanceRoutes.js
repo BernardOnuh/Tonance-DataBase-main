@@ -23,6 +23,7 @@ router.post('/register', userController.registerUser);
 router.get('/referrals/:userId', userController.getUserReferrals);
 router.get('/user/:telegramUserId', userController.getUserDetails);
 router.post('/task/complete', userController.completeTask);
+router.get('/user/:userId/completed-tasks', userController.getCompletedTasks); // New route for fetching completed tasks
 
 
 // Leaderboard routes
