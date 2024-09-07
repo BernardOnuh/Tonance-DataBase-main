@@ -183,7 +183,15 @@ exports.completeTask = async (req, res) => {
 exports.getCompletedTasks = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId).populate('tasksCompleted');
+    let user;
+
+    // Check if userId is a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId).populate('tasksCompleted');
+    } else {
+      // If not a valid ObjectId, try to find the user by telegramUserId
+      user = await User.findOne({ telegramUserId: userId }).populate('tasksCompleted');
+    }
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
