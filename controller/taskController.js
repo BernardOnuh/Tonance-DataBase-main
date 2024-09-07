@@ -96,3 +96,34 @@ exports.deleteTask = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.createMultipleTasks = async (req, res) => {
+  try {
+    const tasks = req.body; // Expect an array of task objects
+    if (!Array.isArray(tasks)) {
+      return res.status(400).json({ message: 'Expected an array of tasks' });
+    }
+
+    const createdTasks = await Task.insertMany(tasks);
+    res.status(201).json(createdTasks);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// In userController.js, add the following new function:
+
+exports.getCompletedTasks = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).populate('tasksCompleted');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user.tasksCompleted);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
