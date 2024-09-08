@@ -122,14 +122,15 @@ exports.playGame = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update the user's game score
-    // Instead of using updateGameScore, we'll directly update the necessary fields
-    const oldHighScore = user.gameScore || 0;
-    const newHighScore = score > oldHighScore;
+    // Calculate new balance by adding the game score
+    const newBalance = user.balance + score;
 
-    if (newHighScore) {
-      user.gameScore = score;
-    }
+    // Update user's balance and check if it's a new high score
+    const oldHighScore = user.balance;
+    const newHighScore = newBalance > oldHighScore;
+
+    user.balance = newBalance;
+    user.totalEarnings += score; // Also update total earnings
 
     // Update lastActive
     user.lastActive = new Date();
@@ -138,10 +139,11 @@ exports.playGame = async (req, res) => {
     await user.save();
 
     res.status(200).json({
-      message: 'Game score updated successfully',
+      message: 'Game score added to balance successfully',
       newHighScore,
-      currentScore: score,
-      highScore: user.gameScore
+      scoreAdded: score,
+      newBalance: user.balance,
+      previousBalance: oldHighScore
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
