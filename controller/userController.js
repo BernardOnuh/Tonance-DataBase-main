@@ -123,14 +123,23 @@ exports.playGame = async (req, res) => {
     }
 
     // Update the user's game score
-    user.updateGameScore(score);
+    // Instead of using updateGameScore, we'll directly update the necessary fields
+    const oldHighScore = user.gameScore || 0;
+    const newHighScore = score > oldHighScore;
+
+    if (newHighScore) {
+      user.gameScore = score;
+    }
+
+    // Update lastActive
+    user.lastActive = new Date();
 
     // Save the updated user document
     await user.save();
 
-    res.status(200).json({ 
-      message: 'Game score updated successfully', 
-      newHighScore: user.gameScore === score,
+    res.status(200).json({
+      message: 'Game score updated successfully',
+      newHighScore,
       currentScore: score,
       highScore: user.gameScore
     });
@@ -138,7 +147,6 @@ exports.playGame = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 exports.completeTask = async (req, res) => {
   try {
