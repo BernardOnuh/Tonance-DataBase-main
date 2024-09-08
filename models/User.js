@@ -13,8 +13,8 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Normal', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster'],
-    default: 'Normal',
+    enum: ['Normal', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster', 'User'],
+    default: 'User',
   },
   balance: {
     type: Number,
@@ -49,6 +49,10 @@ const UserSchema = new mongoose.Schema({
     default: 0,
   },
   totalEarnings: {
+    type: Number,
+    default: 0,
+  },
+  gameScore: {
     type: Number,
     default: 0,
   },
