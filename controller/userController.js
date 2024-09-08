@@ -53,6 +53,7 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+
 // Get all referrals for a user
 exports.getUserReferrals = async (req, res) => {
   try {
@@ -76,7 +77,7 @@ exports.getUserReferrals = async (req, res) => {
   }
 };
 
-// Get user details by Telegram user ID
+// Get user details
 exports.getUserDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -86,19 +87,21 @@ exports.getUserDetails = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const currentTime = Date.now();
-    const timeSinceLastClaim = currentTime - user.lastClaimTime;
-    const claimCooldown = 60 * 60 * 1000; // 1 hour cooldown in milliseconds
-    let secondsUntilNextClaim = Math.max((claimCooldown - timeSinceLastClaim) / 1000, 0);
+    user.checkAndUpdateRole();
+
+    const currentEarnings = user.isEarning ? user.calculateEarnings() : 0;
 
     res.json({
       telegramUserId: user.telegramUserId,
       username: user.username,
+      role: user.role,
       balance: user.balance,
-      claimStreak: user.claimStreak,
+      currentEarnings,
+      isEarning: user.isEarning,
+      lastStartTime: user.lastStartTime,
       lastClaimTime: user.lastClaimTime,
-      secondsUntilNextClaim: Math.ceil(secondsUntilNextClaim),
-      referralCode: user.referralCode,
+      roleExpiryDate: user.roleExpiryDate,
+      referralCode: user.username, // Assuming username is used as referral code
       referredBy: user.referredBy,
       referrals: user.referrals.map(ref => ref.username),
     });
@@ -106,6 +109,7 @@ exports.getUserDetails = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
 
 exports.playGame = async (req, res) => {
   try {
@@ -198,6 +202,84 @@ exports.getCompletedTasks = async (req, res) => {
     }
 
     res.json(user.tasksCompleted);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// Start earning points
+exports.startEarning = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const user = await User.findOne({ telegramUserId });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.isEarning) {
+      return res.status(400).json({ message: 'User is already earning points' });
+    }
+
+    user.startEarning();
+    await user.save();
+
+    res.status(200).json({ message: 'Started earning points', user });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Claim points
+exports.claimPoints = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const user = await User.findOne({ telegramUserId });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.checkAndUpdateRole();
+
+    const claimedAmount = user.claim();
+    
+    if (claimedAmount > 0) {
+      await user.save();
+      
+      // Automatically start earning again after claiming
+      user.startEarning();
+      await user.save();
+
+      res.status(200).json({ 
+        message: 'Points claimed successfully', 
+        claimedAmount, 
+        newBalance: user.balance,
+        isEarning: user.isEarning
+      });
+    } else {
+      res.status(400).json({ message: 'No points available to claim' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// Set user role
+exports.setUserRole = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const { role, durationInDays } = req.body;
+    const user = await User.findOne({ telegramUserId });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.setRole(role, durationInDays);
+    await user.save();
+
+    res.status(200).json({ message: 'User role updated successfully', user });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

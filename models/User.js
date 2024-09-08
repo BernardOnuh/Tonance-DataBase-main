@@ -13,8 +13,8 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['User', 'Promoter', 'Influencer', 'Ambassador'],
-    default: 'User',
+    enum: ['Normal', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster'],
+    default: 'Normal',
   },
   balance: {
     type: Number,
@@ -22,23 +22,27 @@ const UserSchema = new mongoose.Schema({
   },
   lastClaimTime: {
     type: Date,
-    default: null,  // Indicates no claim yet
+    default: null,
   },
-  firstClaim: {
+  lastStartTime: {
+    type: Date,
+    default: null,
+  },
+  roleExpiryDate: {
+    type: Date,
+    default: null,
+  },
+  isEarning: {
     type: Boolean,
-    default: false,  // Track whether the user has made their first claim
-  },
-  claimStreak: {
-    type: Number,
-    default: 0,  // Tracks consecutive claims within 25 hours
+    default: false,
   },
   referredBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',  // Reference to another User document
+    ref: 'User',
   },
   referrals: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',  // Array of references to User documents
+    ref: 'User',
   }],
   joinBonus: {
     type: Number,
@@ -50,7 +54,7 @@ const UserSchema = new mongoose.Schema({
   },
   tasksCompleted: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Task',  // Reference to completed tasks
+    ref: 'Task',
   }],
   createdAt: {
     type: Date,
@@ -62,62 +66,79 @@ const UserSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Method to update the user's role based on the number of referrals
-UserSchema.methods.updateRole = function() {
-  const referralCount = this.referrals.length;
-  if (referralCount >= 5001) {
-    this.role = 'Ambassador';
-  } else if (referralCount >= 1001) {
-    this.role = 'Influencer';
-  } else if (referralCount >= 1) {
-    this.role = 'Promoter';
-  } else {
-    this.role = 'User';
+UserSchema.methods.startEarning = function() {
+  if (!this.isEarning) {
+    this.isEarning = true;
+    this.lastStartTime = new Date();
+    return true;
+  }
+  return false;
+};
+
+UserSchema.methods.stopEarning = function() {
+  if (this.isEarning) {
+    this.isEarning = false;
+    return true;
+  }
+  return false;
+};
+
+UserSchema.methods.calculateEarnings = function() {
+  if (!this.isEarning || !this.lastStartTime) {
+    return 0;
+  }
+
+  const now = new Date();
+  const hoursSinceStart = (now - this.lastStartTime) / (1000 * 60 * 60);
+  let baseEarnings = 3600 * hoursSinceStart;
+
+  switch (this.role) {
+    case 'MonthlyBooster':
+    case 'LifeTimeBooster':
+      return baseEarnings;
+    case 'Monthly3xBooster':
+      return baseEarnings * 3;
+    case 'LifeTime6xBooster':
+      return baseEarnings * 6;
+    default:
+      return Math.min(baseEarnings, 3600); // Cap at 3600 for Normal users
   }
 };
 
-// Method to add a referral and update the role if necessary
-UserSchema.methods.addReferral = function(userId) {
-  if (!this.referrals.includes(userId)) {
-    this.referrals.push(userId);
-    this.updateRole();
+UserSchema.methods.claim = function() {
+  const earnings = this.calculateEarnings();
+  if (earnings > 0) {
+    this.addEarnings(earnings);
+    this.lastClaimTime = new Date();
+    
+    if (this.role === 'Normal') {
+      this.stopEarning();
+    }
+
+    return earnings;
   }
+  return 0;
 };
 
-// Method to add earnings to the user's balance and total earnings
 UserSchema.methods.addEarnings = function(amount) {
   this.balance += amount;
   this.totalEarnings += amount;
 };
 
-// Method to check if the user can claim a reward
-UserSchema.methods.canClaim = function() {
-  if (!this.firstClaim) {
-    return true;  // Allow the first claim
+UserSchema.methods.setRole = function(role, durationInDays = null) {
+  this.role = role;
+  if (durationInDays) {
+    this.roleExpiryDate = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
+  } else if (role.includes('LifeTime')) {
+    this.roleExpiryDate = null;
   }
-  const hoursSinceLastClaim = (Date.now() - this.lastClaimTime) / (1000 * 60 * 60);
-  return hoursSinceLastClaim >= 1;
 };
 
-// Method to claim the reward
-UserSchema.methods.claim = function() {
-  const now = new Date();
-  const hoursSinceLastClaim = (now - this.lastClaimTime) / (1000 * 60 * 60);
-
-  let claimAmount = 3600;  // Base claim amount
-
-  if (this.firstClaim && hoursSinceLastClaim <= 25) {  // Maintain streak if within 25 hours
-    this.claimStreak += 1;
-    claimAmount += Math.min(this.claimStreak, 10);  // Bonus for streak, max 10 extra points
-  } else {
-    this.claimStreak = 1;  // Reset streak if more than 25 hours have passed
+UserSchema.methods.checkAndUpdateRole = function() {
+  if (this.roleExpiryDate && this.roleExpiryDate <= new Date()) {
+    this.role = 'Normal';
+    this.roleExpiryDate = null;
   }
-
-  this.lastClaimTime = now;
-  this.firstClaim = true;  // Set first claim to true after the initial claim
-  this.addEarnings(claimAmount);
-
-  return claimAmount;
 };
 
 module.exports = mongoose.model('User', UserSchema);
