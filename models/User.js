@@ -13,7 +13,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Normal', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster', 'User'],
+    enum: ['User', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster'],
     default: 'User',
   },
   balance: {
@@ -104,8 +104,10 @@ UserSchema.methods.calculateEarnings = function() {
       return baseEarnings * 3;
     case 'LifeTime6xBooster':
       return baseEarnings * 6;
+    case 'User':
+      return Math.min(baseEarnings, 3600); // Cap at 3600 for User role
     default:
-      return Math.min(baseEarnings, 3600); // Cap at 3600 for Normal users
+      return 0;
   }
 };
 
@@ -114,11 +116,7 @@ UserSchema.methods.claim = function() {
   if (earnings > 0) {
     this.addEarnings(earnings);
     this.lastClaimTime = new Date();
-    
-    if (this.role === 'Normal') {
-      this.stopEarning();
-    }
-
+    this.stopEarning(); // Stop earning for all user types after claiming
     return earnings;
   }
   return 0;
@@ -140,9 +138,19 @@ UserSchema.methods.setRole = function(role, durationInDays = null) {
 
 UserSchema.methods.checkAndUpdateRole = function() {
   if (this.roleExpiryDate && this.roleExpiryDate <= new Date()) {
-    this.role = 'Normal';
+    this.role = 'User';
     this.roleExpiryDate = null;
   }
+};
+
+UserSchema.methods.canStartEarning = function() {
+  if (this.role === 'User') {
+    // For User role, check if it's been at least 1 hour since last claim or start
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    return !this.lastClaimTime || this.lastClaimTime < oneHourAgo;
+  }
+  // For other roles, they can always start earning
+  return true;
 };
 
 module.exports = mongoose.model('User', UserSchema);

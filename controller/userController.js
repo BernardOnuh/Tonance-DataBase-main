@@ -216,7 +216,7 @@ exports.getCompletedTasks = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-// Start earning points
+
 exports.startEarning = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -230,6 +230,10 @@ exports.startEarning = async (req, res) => {
       return res.status(400).json({ message: 'User is already earning points' });
     }
 
+    if (!user.canStartEarning()) {
+      return res.status(400).json({ message: 'User cannot start earning yet. Please wait.' });
+    }
+
     user.startEarning();
     await user.save();
 
@@ -239,7 +243,6 @@ exports.startEarning = async (req, res) => {
   }
 };
 
-// Claim points
 exports.claimPoints = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -252,17 +255,13 @@ exports.claimPoints = async (req, res) => {
     user.checkAndUpdateRole();
 
     const claimedAmount = user.claim();
-    
+
     if (claimedAmount > 0) {
       await user.save();
-      
-      // Automatically start earning again after claiming
-      user.startEarning();
-      await user.save();
 
-      res.status(200).json({ 
-        message: 'Points claimed successfully', 
-        claimedAmount, 
+      res.status(200).json({
+        message: 'Points claimed successfully',
+        claimedAmount,
         newBalance: user.balance,
         isEarning: user.isEarning
       });
