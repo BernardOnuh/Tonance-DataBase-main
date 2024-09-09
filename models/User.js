@@ -68,7 +68,35 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-}, { }, { timestamps: true });
+}, { timestamps: true });
+
+// Add a compound index for additional uniqueness constraint
+UserSchema.index({ telegramUserId: 1, username: 1 }, { unique: true });
+
+// Pre-save hook to handle potential duplicate key errors
+UserSchema.pre('save', async function(next) {
+  try {
+    const existingUser = await this.constructor.findOne({
+      $or: [
+        { telegramUserId: this.telegramUserId },
+        { username: this.username }
+      ]
+    });
+
+    if (existingUser) {
+      if (existingUser.telegramUserId === this.telegramUserId) {
+        throw new Error('A user with this Telegram ID already exists.');
+      }
+      if (existingUser.username === this.username) {
+        throw new Error('This username is already taken.');
+      }
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 UserSchema.methods.startEarning = function() {
   if (!this.isEarning) {
@@ -150,61 +178,4 @@ UserSchema.methods.canStartEarning = function() {
   return !this.isEarning;
 };
 
-module.exports = mongoose.model('User', UserSchema);
-
-// Controller functions
-exports.startEarning = async (req, res) => {
-  try {
-    const { telegramUserId } = req.params;
-    const user = await User.findOne({ telegramUserId });
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    if (user.isEarning) {
-      return res.status(400).json({ message: 'User is already earning points' });
-    }
-    
-    if (!user.canStartEarning()) {
-      return res.status(400).json({ message: 'User cannot start earning right now.' });
-    }
-    
-    user.startEarning();
-    await user.save();
-    
-    res.status(200).json({ message: 'Started earning points', user });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-exports.claimPoints = async (req, res) => {
-  try {
-    const { telegramUserId } = req.params;
-    const user = await User.findOne({ telegramUserId });
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    user.checkAndUpdateRole();
-    
-    const claimedAmount = user.claim();
-    
-    if (claimedAmount > 0) {
-      await user.save();
-      
-      res.status(200).json({
-        message: 'Points claimed successfully',
-        claimedAmount,
-        newBalance: user.balance,
-        isEarning: user.isEarning
-      });
-    } else {
-      res.status(400).json({ message: 'No points available to claim' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+const User = mongoose.model('User', UserSchema);
