@@ -88,13 +88,13 @@ UserSchema.methods.stopEarning = function() {
 };
 
 UserSchema.methods.calculateEarnings = function() {
-  if (!this.isEarning || !this.lastStartTime) {
+  if (!this.lastStartTime) {
     return 0;
   }
 
   const now = new Date();
   const hoursSinceStart = (now - this.lastStartTime) / (1000 * 60 * 60);
-  let baseEarnings = 3600 * hoursSinceStart;
+  let baseEarnings = 3600 * Math.floor(hoursSinceStart); // Only count full hours
 
   switch (this.role) {
     case 'MonthlyBooster':
@@ -116,7 +116,11 @@ UserSchema.methods.claim = function() {
   if (earnings > 0) {
     this.addEarnings(earnings);
     this.lastClaimTime = new Date();
-    this.stopEarning(); // Stop earning for all user types after claiming
+    if (this.role === 'User') {
+      this.stopEarning(); // Stop earning only for User role
+    } else {
+      this.lastStartTime = new Date(); // Reset start time for other roles
+    }
     return earnings;
   }
   return 0;
@@ -134,12 +138,16 @@ UserSchema.methods.setRole = function(role, durationInDays = null) {
   } else if (role.includes('LifeTime')) {
     this.roleExpiryDate = null;
   }
+  if (role !== 'User') {
+    this.startEarning(); // Automatically start earning for non-User roles
+  }
 };
 
 UserSchema.methods.checkAndUpdateRole = function() {
   if (this.roleExpiryDate && this.roleExpiryDate <= new Date()) {
     this.role = 'User';
     this.roleExpiryDate = null;
+    this.stopEarning(); // Stop earning when role changes to User
   }
 };
 
@@ -149,8 +157,8 @@ UserSchema.methods.canStartEarning = function() {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     return !this.lastClaimTime || this.lastClaimTime < oneHourAgo;
   }
-  // For other roles, they can always start earning
-  return true;
+  // For other roles, they are always earning
+  return false;
 };
 
 module.exports = mongoose.model('User', UserSchema);
