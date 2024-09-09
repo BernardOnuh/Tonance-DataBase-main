@@ -217,26 +217,27 @@ exports.getCompletedTasks = async (req, res) => {
   }
 };
 
+// Controller functions
 exports.startEarning = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
     const user = await User.findOne({ telegramUserId });
-
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    
     if (user.isEarning) {
       return res.status(400).json({ message: 'User is already earning points' });
     }
-
+    
     if (!user.canStartEarning()) {
-      return res.status(400).json({ message: 'User cannot start earning yet. Please wait.' });
+      return res.status(400).json({ message: 'User cannot start earning right now.' });
     }
-
+    
     user.startEarning();
     await user.save();
-
+    
     res.status(200).json({ message: 'Started earning points', user });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -247,18 +248,18 @@ exports.claimPoints = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
     const user = await User.findOne({ telegramUserId });
-
+    
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    
     user.checkAndUpdateRole();
-
+    
     const claimedAmount = user.claim();
-
+    
     if (claimedAmount > 0) {
       await user.save();
-
+      
       res.status(200).json({
         message: 'Points claimed successfully',
         claimedAmount,
