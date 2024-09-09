@@ -155,7 +155,7 @@ UserSchema.methods.canStartEarning = function() {
   if (this.role === 'User') {
     // For User role, check if it's been at least 1 hour since last claim or start
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    return !this.lastClaimTime || this.lastClaimTime < oneHourAgo;
+    return false;
   }
   // For other roles, they are always earning
   return false;
