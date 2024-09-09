@@ -294,3 +294,27 @@ exports.setUserRole = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getTotalStats = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    
+    const aggregationResult = await User.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalMined: { $sum: '$totalEarnings' }
+        }
+      }
+    ]);
+
+    const totalMined = aggregationResult.length > 0 ? aggregationResult[0].totalMined : 0;
+
+    res.status(200).json({
+      totalUsers,
+      totalMined
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

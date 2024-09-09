@@ -27,6 +27,7 @@ router.get('/user/:userId/completed-tasks', userController.getCompletedTasks); /
 router.post('/users/:telegramUserId/start-earning', userController.startEarning);
 router.post('/users/:telegramUserId/claim', userController.claimPoints);
 router.put('/users/:telegramUserId/role', userController.setUserRole);
+router.get('/stats', userController.getTotalStats);
 
 
 // Leaderboard routes
