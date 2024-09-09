@@ -88,24 +88,24 @@ UserSchema.methods.stopEarning = function() {
 };
 
 UserSchema.methods.calculateEarnings = function() {
-  if (!this.lastStartTime) {
+  if (!this.lastStartTime || !this.isEarning) {
     return 0;
   }
   
   const now = new Date();
   const hoursSinceStart = (now - this.lastStartTime) / (1000 * 60 * 60);
-  let baseEarnings = 3600 * Math.floor(hoursSinceStart); // Only count full hours
-  
+  let baseEarnings = 3600 * hoursSinceStart; // Calculate earnings based on exact time
+
   switch (this.role) {
     case 'MonthlyBooster':
     case 'LifeTimeBooster':
-      return baseEarnings;
+      return Math.floor(baseEarnings);
     case 'Monthly3xBooster':
-      return baseEarnings * 3;
+      return Math.floor(baseEarnings * 3);
     case 'LifeTime6xBooster':
-      return baseEarnings * 6;
+      return Math.floor(baseEarnings * 6);
     case 'User':
-      return Math.min(baseEarnings, 3600); // Cap at 3600 for User role
+      return Math.min(Math.floor(baseEarnings), 3600); // Cap at 3600 for User role
     default:
       return 0;
   }
@@ -117,6 +117,7 @@ UserSchema.methods.claim = function() {
     this.addEarnings(earnings);
     this.lastClaimTime = new Date();
     this.stopEarning(); // Stop earning for all roles after claiming
+    this.lastStartTime = null; // Reset lastStartTime
     return earnings;
   }
   return 0;
@@ -145,8 +146,65 @@ UserSchema.methods.checkAndUpdateRole = function() {
 };
 
 UserSchema.methods.canStartEarning = function() {
-  // All roles can start earning at any time
+  // All roles can start earning at any time if they're not already earning
   return !this.isEarning;
 };
 
 module.exports = mongoose.model('User', UserSchema);
+
+// Controller functions
+exports.startEarning = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const user = await User.findOne({ telegramUserId });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.isEarning) {
+      return res.status(400).json({ message: 'User is already earning points' });
+    }
+    
+    if (!user.canStartEarning()) {
+      return res.status(400).json({ message: 'User cannot start earning right now.' });
+    }
+    
+    user.startEarning();
+    await user.save();
+    
+    res.status(200).json({ message: 'Started earning points', user });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.claimPoints = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const user = await User.findOne({ telegramUserId });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    user.checkAndUpdateRole();
+    
+    const claimedAmount = user.claim();
+    
+    if (claimedAmount > 0) {
+      await user.save();
+      
+      res.status(200).json({
+        message: 'Points claimed successfully',
+        claimedAmount,
+        newBalance: user.balance,
+        isEarning: user.isEarning
+      });
+    } else {
+      res.status(400).json({ message: 'No points available to claim' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
