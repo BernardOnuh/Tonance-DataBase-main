@@ -139,7 +139,7 @@ UserSchema.methods.setRole = function(role, durationInDays = null) {
     this.roleExpiryDate = null;
   }
   if (role !== 'User') {
-    this.startEarning(); // Automatically start earning for non-User roles
+    this.startEarning(); // Automatically start earning for non-User role
   }
 };
 
