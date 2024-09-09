@@ -217,7 +217,6 @@ exports.getCompletedTasks = async (req, res) => {
   }
 };
 
-// Controller functions
 exports.startEarning = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -236,6 +235,7 @@ exports.startEarning = async (req, res) => {
     }
     
     user.startEarning();
+    user.lastActive = new Date();  // Update lastActive
     await user.save();
     
     res.status(200).json({ message: 'Started earning points', user });
@@ -258,6 +258,7 @@ exports.claimPoints = async (req, res) => {
     const claimedAmount = user.claim();
     
     if (claimedAmount > 0) {
+      user.lastActive = new Date();  // Update lastActive
       await user.save();
       
       res.status(200).json({
@@ -297,22 +298,31 @@ exports.setUserRole = async (req, res) => {
 
 exports.getTotalStats = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    
-    const aggregationResult = await User.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalMined: { $sum: '$totalEarnings' }
+    const now = new Date();
+    const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(now - 60 * 60 * 1000);
+
+    const [totalStats, dailyUsers, onlineUsers] = await Promise.all([
+      User.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalUsers: { $sum: 1 },
+            totalMined: { $sum: '$totalEarnings' }
+          }
         }
-      }
+      ]),
+      User.countDocuments({ lastClaimTime: { $gte: oneDayAgo } }),
+      User.countDocuments({ lastActive: { $gte: oneHourAgo } })
     ]);
 
-    const totalMined = aggregationResult.length > 0 ? aggregationResult[0].totalMined : 0;
+    const stats = totalStats[0] || { totalUsers: 0, totalMined: 0 };
 
     res.status(200).json({
-      totalUsers,
-      totalMined
+      totalUsers: stats.totalUsers,
+      totalMined: stats.totalMined,
+      dailyUsers,
+      onlineUsers
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
