@@ -1,6 +1,6 @@
 // controllers/leaderboardController.js
 const Leaderboard = require('../models/Leaderboard');
-const User = require('../models/User');
+const { User, Stake } = require('../models/User');
 
 exports.getLeaderboard = async (req, res) => {
   try {
