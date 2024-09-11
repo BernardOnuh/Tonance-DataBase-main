@@ -158,7 +158,7 @@ UserSchema.methods.stake = async function(amount, period) {
   let interestRate;
   switch (period) {
     case 3:
-      interestRate if 0.03;user      return res
+      interestRate if 0.03;
     case 15:
       interestRate = 0.10;
       break;
