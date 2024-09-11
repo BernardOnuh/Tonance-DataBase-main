@@ -1,5 +1,34 @@
 const mongoose = require('mongoose');
 
+// Define StakeSchema
+const StakeSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+  period: {
+    type: Number,
+    required: true
+  },
+  interestRate: {
+    type: Number,
+    required: true
+  },
+  endDate: {
+    type: Date,
+    required: true
+  },
+  claimed: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true });
+
 const UserSchema = new mongoose.Schema({
   telegramUserId: {
     type: String,
@@ -60,15 +89,15 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task',
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
+  stakes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Stake',
+  }],
   lastActive: {
     type: Date,
     default: Date.now,
   },
-}, { }, { timestamps: true });
+}, { timestamps: true });
 
 UserSchema.methods.startEarning = function() {
   if (!this.isEarning) {
@@ -183,10 +212,8 @@ UserSchema.methods.stake = async function(amount, period) {
 
   await stake.save();
   
-  if (!this.stakes) {
-    this.stakes = [];
-  }
   this.stakes.push(stake._id);
+  this.balance -= amount; // Deduct staked amount from balance
   await this.save();
 
   return stake;
@@ -195,7 +222,7 @@ UserSchema.methods.stake = async function(amount, period) {
 UserSchema.methods.claimStake = async function(stakeId) {
   const stake = await Stake.findById(stakeId);
   
-  if (!stake || stake.user.toString() !== this._id.toString()) {
+  if (!stake || !this.stakes.includes(stakeId)) {
     throw new Error('Stake not found or does not belong to this user');
   }
 
@@ -212,6 +239,8 @@ UserSchema.methods.claimStake = async function(stakeId) {
 
   this.balance += totalAmount;
   stake.claimed = true;
+
+  this.stakes = this.stakes.filter(id => id.toString() !== stakeId.toString());
 
   await stake.save();
   await this.save();
