@@ -3,12 +3,23 @@ const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 const Task = require('../models/Task');
 
+// Helper function for error handling
+const handleError = (res, error, statusCode = 500) => {
+  console.error('Error:', error);
+  res.status(statusCode).json({ message: error.message || 'An error occurred' });
+};
+
 // Register a new user
 exports.registerUser = async (req, res) => {
   try {
     const { telegramUserId, username, referralCode } = req.body;
-    let referredBy = null;
 
+    // Input validation
+    if (!telegramUserId || !username) {
+      return res.status(400).json({ message: 'Telegram User ID and username are required' });
+    }
+
+    let referredBy = null;
     if (referralCode) {
       referredBy = await User.findOne({ username: referralCode });
       if (!referredBy) {
@@ -24,48 +35,48 @@ exports.registerUser = async (req, res) => {
     await user.save();
 
     if (referredBy) {
-      referredBy.referrals.push(user._id);
-      referredBy.addEarnings(15000);
-      await referredBy.save();
-
-      const referralBonuses = [0.20, 0.10, 0.05, 0.025, 0.0125];
-      let currentReferrer = referredBy;
-
-      for (let i = 0; i < referralBonuses.length; i++) {
-        if (currentReferrer) {
-          const bonusAmount = 30000 * referralBonuses[i];
-          currentReferrer.addEarnings(bonusAmount);
-          await currentReferrer.save();
-
-          currentReferrer = await User.findById(currentReferrer.referredBy);
-        } else {
-          break;
-        }
-      }
+      await processReferral(referredBy, user);
     }
 
-    user.addEarnings(30000);
+    user.addEarnings(30000); // Join bonus
     await user.save();
 
     res.status(201).json(user);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    handleError(res, error, 400);
   }
 };
 
+// Helper function to process referral bonuses
+async function processReferral(referrer, newUser) {
+  referrer.referrals.push(newUser._id);
+  referrer.addEarnings(15000);
+  await referrer.save();
+
+  const referralBonuses = [0.20, 0.10, 0.05, 0.025, 0.0125];
+  let currentReferrer = referrer;
+
+  for (const bonus of referralBonuses) {
+    if (!currentReferrer) break;
+    
+    const bonusAmount = Math.floor(30000 * bonus);
+    currentReferrer.addEarnings(bonusAmount);
+    await currentReferrer.save();
+
+    currentReferrer = await User.findById(currentReferrer.referredBy);
+  }
+}
 
 // Get all referrals for a user
 exports.getUserReferrals = async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const { userId } = req.params;
 
     if (!ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format' });
     }
 
-    const objectId = new ObjectId(userId);
-
-    const user = await User.findById(objectId).populate('referrals', 'username');
+    const user = await User.findById(userId).populate('referrals', 'username');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -73,10 +84,11 @@ exports.getUserReferrals = async (req, res) => {
 
     res.json(user.referrals);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Get user details
 exports.getUserDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -87,7 +99,6 @@ exports.getUserDetails = async (req, res) => {
     }
 
     user.checkAndUpdateRole();
-
     const currentEarnings = user.isEarning ? user.calculateEarnings() : 0;
 
     res.json({
@@ -100,109 +111,99 @@ exports.getUserDetails = async (req, res) => {
       lastStartTime: user.lastStartTime,
       lastClaimTime: user.lastClaimTime,
       roleExpiryDate: user.roleExpiryDate,
-      referralCode: user.username, // Assuming username is used as referral code
+      referralCode: user.username,
       referredBy: user.referredBy,
       referrals: user.referrals.map(ref => ref.username),
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
-
+// Play game and update user score
 exports.playGame = async (req, res) => {
   try {
     const { username, score } = req.body;
 
-    // Find the user by username
+    if (!username || typeof score !== 'number') {
+      return res.status(400).json({ message: 'Invalid input' });
+    }
+
     const user = await User.findOne({ username });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Calculate new balance by adding the game score
-    const newBalance = user.balance + score;
-
-    // Update user's balance and check if it's a new high score
-    const oldHighScore = user.balance;
-    const newHighScore = newBalance > oldHighScore;
-
-    user.balance = newBalance;
-    user.totalEarnings += score; // Also update total earnings
-
-    // Update lastActive
+    const oldBalance = user.balance;
+    user.balance += score;
+    user.totalEarnings += score;
     user.lastActive = new Date();
 
-    // Save the updated user document
     await user.save();
 
     res.status(200).json({
       message: 'Game score added to balance successfully',
-      newHighScore,
+      newHighScore: user.balance > oldBalance,
       scoreAdded: score,
       newBalance: user.balance,
-      previousBalance: oldHighScore
+      previousBalance: oldBalance
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Complete a task
 exports.completeTask = async (req, res) => {
   try {
     const { username, taskId } = req.body;
 
-    // Find the user by username
-    const user = await User.findOne({ username });
+    if (!username || !taskId) {
+      return res.status(400).json({ message: 'Username and taskId are required' });
+    }
+
+    const [user, task] = await Promise.all([
+      User.findOne({ username }),
+      Task.findById(taskId)
+    ]);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // Find the task by taskId
-    const task = await Task.findById(taskId);
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check if the task is already completed by the user
     if (user.tasksCompleted.includes(taskId)) {
       return res.status(400).json({ message: 'Task already completed' });
     }
 
-    // Add the task to the user's completed tasks
     user.tasksCompleted.push(taskId);
+    user.addEarnings(task.points);
 
-    // Optional: If you have a `tasks` array, remove the task from pending tasks
-    // (If `tasks` field is meant to track pending tasks, initialize it if necessary)
     if (user.tasks) {
       user.tasks = user.tasks.filter(t => t.toString() !== taskId);
     }
 
-    // Reward the user for completing the task
-    user.addEarnings(task.points);
-
-    // Save the updated user document
     await user.save();
 
     res.status(200).json({ message: 'Task completed successfully', user });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Get completed tasks
 exports.getCompletedTasks = async (req, res) => {
   try {
     const { userId } = req.params;
     let user;
 
-    // Check if userId is a valid ObjectId
-    if (mongoose.Types.ObjectId.isValid(userId)) {
+    if (ObjectId.isValid(userId)) {
       user = await User.findById(userId).populate('tasksCompleted');
     } else {
-      // If not a valid ObjectId, try to find the user by telegramUserId
       user = await User.findOne({ telegramUserId: userId }).populate('tasksCompleted');
     }
     
@@ -212,10 +213,11 @@ exports.getCompletedTasks = async (req, res) => {
 
     res.json(user.tasksCompleted);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Start earning points
 exports.startEarning = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -234,15 +236,16 @@ exports.startEarning = async (req, res) => {
     }
     
     user.startEarning();
-    user.lastActive = new Date();  // Update lastActive
+    user.lastActive = new Date();
     await user.save();
     
     res.status(200).json({ message: 'Started earning points', user });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Claim earned points
 exports.claimPoints = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -253,11 +256,10 @@ exports.claimPoints = async (req, res) => {
     }
     
     user.checkAndUpdateRole();
-    
     const claimedAmount = user.claim();
     
     if (claimedAmount > 0) {
-      user.lastActive = new Date();  // Update lastActive
+      user.lastActive = new Date();
       await user.save();
       
       res.status(200).json({
@@ -270,16 +272,20 @@ exports.claimPoints = async (req, res) => {
       res.status(400).json({ message: 'No points available to claim' });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
-
 
 // Set user role
 exports.setUserRole = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
     const { role, durationInDays } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ message: 'Role is required' });
+    }
+
     const user = await User.findOne({ telegramUserId });
 
     if (!user) {
@@ -291,10 +297,11 @@ exports.setUserRole = async (req, res) => {
 
     res.status(200).json({ message: 'User role updated successfully', user });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
 
+// Get total stats
 exports.getTotalStats = async (req, res) => {
   try {
     const now = new Date();
@@ -324,6 +331,6 @@ exports.getTotalStats = async (req, res) => {
       onlineUsers
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    handleError(res, error);
   }
 };
