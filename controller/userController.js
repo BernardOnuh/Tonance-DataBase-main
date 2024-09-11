@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const { User, Stake } = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 const Task = require('../models/Task');
@@ -77,7 +77,6 @@ exports.getUserReferrals = async (req, res) => {
   }
 };
 
-// Get user details
 exports.getUserDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
