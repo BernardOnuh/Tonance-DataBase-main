@@ -19,20 +19,25 @@ exports.createStake = async (req, res) => {
 };
 
 exports.claimStake = async (req, res) => {
-  try {
-    const { userId, stakeId } = req.body;
-    const user = await User.findByTelegramUserId(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    try {
+      const { userId, stakeId } = req.body;
+      const user = await User.findOne({ telegramUserId: userId });
+  
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+  
+      const claimResult = await user.claimStake(stakeId);
+      res.status(200).json({
+        message: 'Stake claimed successfully',
+        principal: claimResult.principal,
+        interest: claimResult.interest,
+        totalClaimed: claimResult.totalAmount
+      });
+    } catch (error) {
+      res.status(400).json({ message: error.message });
     }
-
-    const claimedAmount = await user.claimStake(stakeId);
-    res.status(200).json({ message: 'Stake claimed successfully', claimedAmount });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+  };
 
 exports.getActiveStakes = async (req, res) => {
   try {
