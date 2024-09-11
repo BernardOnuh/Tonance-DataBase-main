@@ -99,6 +99,11 @@ const UserSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// New static method to find a user by telegramUserId
+UserSchema.statics.findByTelegramUserId = function(telegramUserId) {
+  return this.findOne({ telegramUserId: telegramUserId });
+};
+
 UserSchema.methods.startEarning = function() {
   if (!this.isEarning) {
     this.isEarning = true;
