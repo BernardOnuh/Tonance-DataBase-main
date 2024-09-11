@@ -1,5 +1,5 @@
 const Task = require('../models/Task');
-const User = require('../models/User');
+const { User, Stake } = require('../models/User');
 
 // Get all tasks for a specific user (excluding completed ones)
 exports.getTasksForUser = async (req, res) => {
