@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const taskController = require('../controller/taskController');
 const userController = require('../controller/userController');
+const stakeController = require('../controllers/stakeController');
 const leaderboardController = require('../controller/leaderboardController');
 
 // Middleware to check if user is owner (you'll need to implement this)
@@ -37,6 +38,11 @@ router.post('/claim-hourly-points', leaderboardController.claimHourlyPoints);
 
 // New game route
 router.post('/play-game', userController.playGame);
+
+router.post('/create', stakeController.createStake);
+router.post('/claim', stakeController.claimStake);
+router.get('/active/:userId', stakeController.getActiveStakes);
+router.get('/claimable/:userId', stakeController.getClaimableStakes);
 
 
 

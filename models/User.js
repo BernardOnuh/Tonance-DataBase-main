@@ -150,4 +150,87 @@ UserSchema.methods.canStartEarning = function() {
   return !this.isEarning;
 };
 
-module.exports = mongoose.model('User', UserSchema);
+UserSchema.methods.stake = async function(amount, period) {
+  if (this.balance < amount) {
+    throw new Error('Insufficient balance for staking');
+  }
+
+  let interestRate;
+  switch (period) {
+    case 3:
+      interestRate if 0.03;user      return res
+    case 15:
+      interestRate = 0.10;
+      break;
+    case 45:
+      interestRate = 0.35;
+      break;
+    default:
+      throw new Error('Invalid staking period');
+  }
+
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + period);
+
+  const stake = new Stake({
+    user: this._id,
+    amount,
+    period,
+    interestRate,
+    endDate
+  });
+
+  await stake.save();
+  this.stakes.push(stake._id);
+  await this.save();
+
+  return stake;
+};
+
+UserSchema.methods.claimStake = async function(stakeId) {
+  const stake = await Stake.findById(stakeId);
+  
+  if (!stake || stake.user.toString() !== this._id.toString()) {
+    throw new Error('Stake not found or does not belong to this user');
+  }
+
+  if (stake.claimed) {
+    throw new Error('Stake has already been claimed');
+  }
+
+  if (new Date() < stake.endDate) {
+    throw new Error('Staking period has not ended yet');
+  }
+
+  const interest = stake.amount * stake.interestRate;
+  const totalAmount = stake.amount + interest;
+
+  this.balance += totalAmount;
+  stake.claimed = true;
+
+  await stake.save();
+  await this.save();
+
+  return totalAmount;
+};
+
+UserSchema.methods.getActiveStakes = async function() {
+  return Stake.find({
+    _id: { $in: this.stakes },
+    claimed: false,
+    endDate: { $gt: new Date() }
+  });
+};
+
+UserSchema.methods.getClaimableStakes = async function() {
+  return Stake.find({
+    _id: { $in: this.stakes },
+    claimed: false,
+    endDate: { $lte: new Date() }
+  });
+};
+
+const User = mongoose.model('User', UserSchema);
+const Stake = mongoose.model('Stake', StakeSchema);
+
+module.exports = { User, Stake };
