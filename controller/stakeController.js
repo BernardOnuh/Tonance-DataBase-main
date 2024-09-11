@@ -1,5 +1,7 @@
 // stakeController.js
 const { User, Stake } = require('../models/User');
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 exports.createStake = async (req, res) => {
   try {
