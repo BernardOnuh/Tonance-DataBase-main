@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const taskController = require('../controller/taskController');
 const userController = require('../controller/userController');
-const stakeController = require('../controllers/stakeController');
+const stakeController = require('../controller/stakeController');
 const leaderboardController = require('../controller/leaderboardController');
 
 // Middleware to check if user is owner (you'll need to implement this)
