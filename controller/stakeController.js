@@ -1,4 +1,3 @@
-// stakeController.js
 const { User, Stake } = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
@@ -6,7 +5,7 @@ const ObjectId = mongoose.Types.ObjectId;
 exports.createStake = async (req, res) => {
   try {
     const { userId, amount, period } = req.body;
-    const user = await User.findById(userId);
+    const user = await User.findByTelegramUserId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -22,7 +21,7 @@ exports.createStake = async (req, res) => {
 exports.claimStake = async (req, res) => {
   try {
     const { userId, stakeId } = req.body;
-    const user = await User.findById(userId);
+    const user = await User.findByTelegramUserId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -38,7 +37,7 @@ exports.claimStake = async (req, res) => {
 exports.getActiveStakes = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId);
+    const user = await User.findByTelegramUserId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -54,7 +53,7 @@ exports.getActiveStakes = async (req, res) => {
 exports.getClaimableStakes = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId);
+    const user = await User.findByTelegramUserId(userId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
