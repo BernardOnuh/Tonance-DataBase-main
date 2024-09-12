@@ -154,6 +154,48 @@ exports.playGame = async (req, res) => {
   }
 };
 
+
+exports.getRoleDetails = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    const { role, durationInDays } = req.body;
+
+    // Input validation
+    if (!role) {
+      return res.status(400).json({ message: 'Role is required' });
+    }
+
+    // Find the user
+    const user = await User.findOne({ telegramUserId });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Update the user's role
+    user.setRole(role, durationInDays);
+    await user.save();
+
+    // Prepare the response
+    const response = {
+      message: 'User role updated successfully',
+      user: {
+        telegramUserId: user.telegramUserId,
+        username: user.username,
+        role: user.role,
+        roleExpiryDate: user.roleExpiryDate
+      }
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+
+
+
 // Complete a task
 exports.completeTask = async (req, res) => {
   try {
