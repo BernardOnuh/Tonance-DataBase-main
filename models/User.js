@@ -97,14 +97,6 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  specialEventStartDate: {
-    type: Date,
-    default: new Date('2024-09-18'), // 5 days from now (adjust as needed)
-  },
-  specialEventEndDate: {
-    type: Date,
-    default: new Date('2024-10-03'), // 15 days from start (adjust as needed)
-  }
 }, { timestamps: true });
 
 // New static method to find a user by telegramUserId
@@ -136,18 +128,7 @@ UserSchema.methods.calculateEarnings = function() {
   
   const now = new Date();
   const hoursSinceStart = (now - this.lastStartTime) / (1000 * 60 * 60);
-  let baseEarnings = 3600 * hoursSinceStart; // Calculate earnings based on exact time
-
-  // Apply special event multipliers
-  if (now >= this.specialEventStartDate && now < this.specialEventEndDate) {
-    if (now < new Date(this.specialEventStartDate.getTime() + 5 * 24 * 60 * 60 * 1000)) {
-      // First 5 days: 3x multiplier
-      baseEarnings *= 3;
-    } else {
-      // Next 10 days: 2x multiplier
-      baseEarnings *= 2;
-    }
-  }
+  let baseEarnings = 10800 * hoursSinceStart; // Calculate earnings based on exact time
 
   switch (this.role) {
     case 'MonthlyBooster':
@@ -158,7 +139,7 @@ UserSchema.methods.calculateEarnings = function() {
     case 'LifeTime6xBooster':
       return Math.floor(baseEarnings * 6);
     case 'User':
-      return Math.min(Math.floor(baseEarnings), 3600); // Cap at 3600 for User role
+      return Math.min(Math.floor(baseEarnings), 10800); // Cap at 10800 for User role
     default:
       return 0;
   }

@@ -145,7 +145,7 @@ exports.claimHourlyPoints = async (req, res) => {
       claimedAmount,
       newBalance: user.balance,
       claimStreak: user.claimStreak,
-      secondsToNextClaim: 3600 // 1 hour until the next claim
+      secondsToNextClaim: 10800 // 1 hour until the next claim
     });
 
   } catch (error) {
