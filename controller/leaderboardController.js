@@ -1,6 +1,50 @@
 // controllers/leaderboardController.js
-const Leaderboard = require('../models/Leaderboard');
-const { User, Stake } = require('../models/User');
+const { User } = require('../models/User');
+
+const CLASSIFICATION_THRESHOLDS = {
+  PROMOTER: 1001,
+  INFLUENCER: 5001,
+  AMBASSADOR: 10001
+};
+
+const CLASSIFICATION_AWARDS = {
+  PROMOTER: 159000,
+  INFLUENCER: 500000,
+  AMBASSADOR: 1200000
+};
+
+async function updateUserClassification(user) {
+  const referralCount = user.referrals.length;
+  let newClassification = 'User';
+  let pointsAwarded = 0;
+
+  if (referralCount >= CLASSIFICATION_THRESHOLDS.AMBASSADOR) {
+    newClassification = 'Ambassador';
+    if (user.role !== 'Ambassador') {
+      pointsAwarded = CLASSIFICATION_AWARDS.AMBASSADOR;
+    }
+  } else if (referralCount >= CLASSIFICATION_THRESHOLDS.INFLUENCER) {
+    newClassification = 'Influencer';
+    if (user.role !== 'Influencer' && user.role !== 'Ambassador') {
+      pointsAwarded = CLASSIFICATION_AWARDS.INFLUENCER;
+    }
+  } else if (referralCount >= CLASSIFICATION_THRESHOLDS.PROMOTER) {
+    newClassification = 'Promoter';
+    if (user.role !== 'Promoter' && user.role !== 'Influencer' && user.role !== 'Ambassador') {
+      pointsAwarded = CLASSIFICATION_AWARDS.PROMOTER;
+    }
+  }
+
+  if (newClassification !== user.role) {
+    user.role = newClassification;
+    user.balance += pointsAwarded;
+    user.totalEarnings += pointsAwarded;
+    await user.save();
+    return { newClassification, pointsAwarded };
+  }
+
+  return { newClassification: user.role, pointsAwarded: 0 };
+}
 
 exports.getLeaderboard = async (req, res) => {
   try {
@@ -10,53 +54,41 @@ exports.getLeaderboard = async (req, res) => {
       query.role = role;
     }
 
-    // Fetch users and calculate the referral count for sorting
-    const users = await User.find(query)
-      .populate('referrals', 'username');
-
-    // Sort users by the length of their referrals array in descending order
+    const users = await User.find(query).populate('referrals', 'username');
     users.sort((a, b) => b.referrals.length - a.referrals.length);
 
-    // Initialize arrays to hold classified users
     const promoters = [];
     const influencers = [];
     const ambassadors = [];
 
-    // Rank users and classify them based on rank
-    users.forEach((user, index) => {
-      const rank = index + 1;
+    for (let user of users) {
+      const { newClassification, pointsAwarded } = await updateUserClassification(user);
       const referralCount = user.referrals.length;
+      const rank = users.indexOf(user) + 1;
 
-      let classification = 'User';
+      const userInfo = {
+        username: user.username,
+        role: newClassification,
+        referralCount: referralCount,
+        rank: rank,
+        pointsAwarded: pointsAwarded,
+        balance: user.balance,
+        totalEarnings: user.totalEarnings
+      };
 
-      if (rank <= 5000) {
-        classification = 'Promoter';
-        promoters.push({
-          username: user.username,
-          role: classification,
-          referralCount: referralCount,
-          rank: rank,
-        });
-      } else if (rank <= 20000) {
-        classification = 'Influencer';
-        influencers.push({
-          username: user.username,
-          role: classification,
-          referralCount: referralCount,
-          rank: rank,
-        });
-      } else if (rank <= 50000) {
-        classification = 'Ambassador';
-        ambassadors.push({
-          username: user.username,
-          role: classification,
-          referralCount: referralCount,
-          rank: rank,
-        });
+      switch (newClassification) {
+        case 'Ambassador':
+          ambassadors.push(userInfo);
+          break;
+        case 'Influencer':
+          influencers.push(userInfo);
+          break;
+        case 'Promoter':
+          promoters.push(userInfo);
+          break;
       }
-    });
+    }
 
-    // Return the leaderboard with separate classifications
     res.json({
       promoters,
       influencers,
@@ -67,76 +99,53 @@ exports.getLeaderboard = async (req, res) => {
   }
 };
 
-
-
 exports.getUserRank = async (req, res) => {
   try {
     const { username } = req.params;
     
-    // Find the specific user by username
     const user = await User.findOne({ username }).populate('referrals', 'username');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Fetch all users and sort them by referral count in descending order
-    const users = await User.find({})
-      .populate('referrals', 'username');
-
+    const users = await User.find({}).populate('referrals', 'username');
     users.sort((a, b) => b.referrals.length - a.referrals.length);
 
-    let rank = 0;
-    let classification = 'User';
+    const rank = users.findIndex(u => u.username === username) + 1;
+    const { newClassification, pointsAwarded } = await updateUserClassification(user);
 
-    // Find the rank of the specific user
-    for (let i = 0; i < users.length; i++) {
-      if (users[i].username === username) {
-        rank = i + 1;
-        break;
-      }
-    }
-
-    // Determine the classification based on rank
-    if (rank <= 5000) {
-      classification = 'Promoter';
-    } else if (rank <= 20000) {
-      classification = 'Influencer';
-    } else if (rank <= 50000) {
-      classification = 'Ambassador';
-    }
-
-    // Return the user's rank, referral count, and classification
     res.json({
       username: user.username,
       referralCount: user.referrals.length,
       rank: rank,
-      classification: classification,
+      classification: newClassification,
+      pointsAwarded: pointsAwarded,
+      totalBalance: user.balance,
+      totalEarnings: user.totalEarnings
     });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
-
-
 exports.claimHourlyPoints = async (req, res) => {
   try {
     const { telegramUserId } = req.body;
-    const user = await User.findOne({ telegramUserId });
+    const user = await User.findByTelegramUserId(telegramUserId);
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    if (!user.canClaim()) {
-      const secondsToNextClaim = Math.ceil((60 * 60) - ((Date.now() - user.lastClaimTime) / 1000));
+    if (!user.canStartEarning()) {
       return res.status(400).json({ 
-        message: 'You can\'t claim yet', 
-        secondsToNextClaim 
+        message: 'You can\'t claim yet',
+        secondsToNextClaim: 0 // The user model doesn't have a cooldown period for claiming
       });
     }
 
+    user.startEarning(); // Start earning if not already earning
     const claimedAmount = user.claim();
     await user.save();
 
@@ -144,13 +153,11 @@ exports.claimHourlyPoints = async (req, res) => {
       message: 'Points claimed successfully',
       claimedAmount,
       newBalance: user.balance,
-      claimStreak: user.claimStreak,
-      secondsToNextClaim: 10800 // 1 hour until the next claim
+      totalEarnings: user.totalEarnings,
+      secondsToNextClaim: 0 // The user can start earning again immediately
     });
 
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
-
-
