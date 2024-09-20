@@ -161,3 +161,29 @@ exports.claimHourlyPoints = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find({}).populate('referrals', 'username');
+    users.sort((a, b) => b.referrals.length - a.referrals.length);
+
+    const allUsers = users.map((user, index) => {
+      const { newClassification, pointsAwarded } = updateUserClassification(user);
+      return {
+        username: user.username,
+        role: newClassification,
+        referralCount: user.referrals.length,
+        rank: index + 1,
+        pointsAwarded: pointsAwarded,
+        balance: user.balance,
+        totalEarnings: user.totalEarnings
+      };
+    });
+
+    res.json({
+      allUsers
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};

@@ -35,6 +35,7 @@ router.put('/users/:telegramUserId/role', userController.getRoleDetails);
 
 // Leaderboard routes
 router.get('/leaderboard', leaderboardController.getLeaderboard);
+router.get('/getUsers', leaderboardController.getAllUsers);
 router.get('/rank/:username', leaderboardController.getUserRank);
 router.post('/claim-hourly-points', leaderboardController.claimHourlyPoints);
 
