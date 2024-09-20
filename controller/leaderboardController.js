@@ -2,7 +2,7 @@
 const { User } = require('../models/User');
 
 const CLASSIFICATION_THRESHOLDS = {
-  PROMOTER: 1,
+  PROMOTER: 1001,
   INFLUENCER: 5001,
   AMBASSADOR: 10001
 };
