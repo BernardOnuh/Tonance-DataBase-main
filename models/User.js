@@ -139,7 +139,7 @@ UserSchema.methods.calculateEarnings = function() {
     case 'LifeTime6xBooster':
       return Math.floor(baseEarnings * 6);
     case 'User':
-      return Math.min(Math.floor(baseEarnings), 10800); // Cap at 10800 for User role
+      return Math.min(Math.floor(baseEarnings), 7200); // Cap at 10800 for User role
     default:
       return 0;
   }
