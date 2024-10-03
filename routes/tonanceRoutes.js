@@ -32,6 +32,7 @@ router.get('/stats', userController.getTotalStats);
 router.put('/users/:telegramUserId/role', userController.getRoleDetails);
 router.put('/wallet-address', userController.updateWalletAddress);
 router.get('/wallet-address', userController.getWalletAddress);
+router.get('/all-users', userController.getAllUsersWithWallets);
 
 
 
