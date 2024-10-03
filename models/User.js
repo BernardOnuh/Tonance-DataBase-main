@@ -40,6 +40,11 @@ const UserSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  walletAddress: {
+    type: String,
+    unique: true,
+    sparse: true, // This allows multiple users to have null wallet addresses
+  },
   role: {
     type: String,
     enum: ['User', 'MonthlyBooster', 'LifeTimeBooster', 'Monthly3xBooster', 'LifeTime6xBooster'],
@@ -267,6 +272,16 @@ UserSchema.methods.getClaimableStakes = async function() {
     claimed: false,
     endDate: { $lte: new Date() }
   });
+};
+
+// New methods for managing wallet address
+UserSchema.methods.setWalletAddress = function(address) {
+  this.walletAddress = address;
+  return this.save();
+};
+
+UserSchema.methods.getWalletAddress = function() {
+  return this.walletAddress;
 };
 
 const User = mongoose.model('User', UserSchema);

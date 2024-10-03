@@ -155,6 +155,69 @@ exports.playGame = async (req, res) => {
 };
 
 
+// Update wallet address using username
+exports.updateWalletAddress = async (req, res) => {
+  try {
+    const { username, walletAddress } = req.body;
+
+    // Check if username and wallet address are provided
+    if (!username || !walletAddress) {
+      return res.status(400).json({ message: 'Username and wallet address are required' });
+    }
+
+    // Find the user by username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if the wallet address is already in use by another user
+    const existingUser = await User.findOne({ walletAddress });
+    if (existingUser && existingUser.username !== user.username) {
+      return res.status(400).json({ message: 'Wallet address is already in use' });
+    }
+
+    // Update wallet address for the found user
+    user.walletAddress = walletAddress;
+    await user.save();
+
+    // Send success response
+    res.json({ message: 'Wallet address updated successfully', walletAddress: user.walletAddress });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+// Get wallet address using username
+exports.getWalletAddress = async (req, res) => {
+  try {
+    const { username } = req.query; // Assuming you pass username as a query parameter
+
+    // Check if the username is provided
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required' });
+    }
+
+    // Find the user by username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if the wallet address exists
+    if (!user.walletAddress) {
+      return res.status(404).json({ message: 'Wallet address not set' });
+    }
+
+    // Respond with the wallet address
+    res.json({ walletAddress: user.walletAddress });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
 exports.getRoleDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
