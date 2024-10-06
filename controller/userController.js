@@ -219,8 +219,8 @@ exports.getWalletAddress = async (req, res) => {
 
 exports.getAllUsersWithWallets = async (req, res) => {
   try {
-    // Fetch all users, selecting only the username and wallet address
-    const users = await User.find({}, 'username walletAddress');
+    // Fetch all users, selecting the username, wallet address, and telegramUserId
+    const users = await User.find({}, 'telegramUserId username walletAddress');
 
     if (!users || users.length === 0) {
       return res.status(404).json({ message: 'No users found' });
@@ -231,6 +231,7 @@ exports.getAllUsersWithWallets = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 
 exports.getRoleDetails = async (req, res) => {
