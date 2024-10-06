@@ -47,6 +47,7 @@ router.post('/play-game', userController.playGame);
 
 router.post('/create', stakeController.createStake);
 router.post('/claim', stakeController.claimStake);
+router.post('/unstake', stakeController.unstake);
 router.get('/active/:userId', stakeController.getActiveStakes);
 router.get('/claimable/:userId', stakeController.getClaimableStakes);
 

@@ -19,13 +19,19 @@ const StakeSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  startDate: {
+    type: Date,
+    default: Date.now,
+    required: true
+  },
   endDate: {
     type: Date,
     required: true
   },
-  claimed: {
-    type: Boolean,
-    default: false
+  status: {
+    type: String,
+    enum: ['active', 'claimed', 'unstaked'],
+    default: 'active'
   }
 }, { timestamps: true });
 
@@ -104,7 +110,7 @@ const UserSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// New static method to find a user by telegramUserId
+// Static method to find a user by telegramUserId
 UserSchema.statics.findByTelegramUserId = function(telegramUserId) {
   return this.findOne({ telegramUserId: telegramUserId });
 };
@@ -209,15 +215,17 @@ UserSchema.methods.stake = async function(amount, period) {
       throw new Error('Invalid staking period');
   }
 
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + period);
+  const startDate = new Date();
+  const endDate = new Date(startDate.getTime() + period * 24 * 60 * 60 * 1000);
 
   const stake = new Stake({
     user: this._id,
     amount,
     period,
     interestRate,
-    endDate
+    startDate,
+    endDate,
+    status: 'active'
   });
 
   await stake.save();
@@ -236,8 +244,8 @@ UserSchema.methods.claimStake = async function(stakeId) {
     throw new Error('Stake not found or does not belong to this user');
   }
 
-  if (stake.claimed) {
-    throw new Error('Stake has already been claimed');
+  if (stake.status !== 'active') {
+    throw new Error('Stake is not active');
   }
 
   if (new Date() < stake.endDate) {
@@ -248,33 +256,64 @@ UserSchema.methods.claimStake = async function(stakeId) {
   const totalAmount = stake.amount + interest;
 
   this.balance += totalAmount;
-  stake.claimed = true;
+  stake.status = 'claimed';
 
   this.stakes = this.stakes.filter(id => id.toString() !== stakeId.toString());
 
   await stake.save();
   await this.save();
 
-  return totalAmount;
+  return { principal: stake.amount, interest, totalAmount };
+};
+
+UserSchema.methods.unstake = async function(stakeId) {
+  const stake = await Stake.findById(stakeId);
+  
+  if (!stake || !this.stakes.includes(stakeId)) {
+    throw new Error('Stake not found or does not belong to this user');
+  }
+
+  if (stake.status !== 'active') {
+    throw new Error('Stake is not active');
+  }
+
+  let principal = stake.amount;
+  let interest = 0;
+
+  if (new Date() >= stake.endDate) {
+    // If the stake has matured, calculate interest
+    interest = stake.amount * stake.interestRate;
+  }
+
+  const totalAmount = principal + interest;
+
+  this.balance += totalAmount;
+  stake.status = 'unstaked';
+
+  this.stakes = this.stakes.filter(id => id.toString() !== stakeId.toString());
+
+  await stake.save();
+  await this.save();
+
+  return { principal, interest, totalAmount };
 };
 
 UserSchema.methods.getActiveStakes = async function() {
   return Stake.find({
     _id: { $in: this.stakes },
-    claimed: false,
-    endDate: { $gt: new Date() }
+    status: 'active'
   });
 };
 
 UserSchema.methods.getClaimableStakes = async function() {
   return Stake.find({
     _id: { $in: this.stakes },
-    claimed: false,
+    status: 'active',
     endDate: { $lte: new Date() }
   });
 };
 
-// New methods for managing wallet address
+// Methods for managing wallet address
 UserSchema.methods.setWalletAddress = function(address) {
   this.walletAddress = address;
   return this.save();
