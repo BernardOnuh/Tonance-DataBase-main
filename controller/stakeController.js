@@ -26,6 +26,10 @@ exports.claimStake = async (req, res) => {
     }
 
     const claimResult = await user.claimStake(stakeId);
+
+      // Add both principal and interest to the user's balance
+      user.balance += claimResult.principal + claimResult.interest;
+    
     res.status(200).json({
       message: 'Stake claimed successfully',
       principal: claimResult.principal,
@@ -47,6 +51,9 @@ exports.unstake = async (req, res) => {
     }
 
     const unstakeResult = await user.unstake(stakeId);
+
+    // Add both principal and interest to the user's balance
+    user.balance += unstakeResult.principal + unstakeResult.interest;
     res.status(200).json({
       message: 'Stake unstaked successfully',
       principal: unstakeResult.principal,
