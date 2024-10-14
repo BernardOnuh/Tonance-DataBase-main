@@ -2,6 +2,7 @@ const { User, Stake } = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 const Task = require('../models/Task');
+const DailyPoint = require('../models/DailyPoint');
 
 // Helper function for error handling
 const handleError = (res, error, statusCode = 500) => {
@@ -36,10 +37,16 @@ exports.registerUser = async (req, res) => {
 
     if (referredBy) {
       await processReferral(referredBy, user);
+      // Add referral to daily points
+      await addReferral(referredBy._id);
     }
 
     user.addEarnings(30000); // Join bonus
     await user.save();
+
+    // Create DailyPoint record for the new user
+    const dailyPoint = new DailyPoint({ user: user._id });
+    await dailyPoint.save();
 
     res.status(201).json(user);
   } catch (error) {
@@ -66,6 +73,123 @@ async function processReferral(referrer, newUser) {
     currentReferrer = await User.findById(currentReferrer.referredBy);
   }
 }
+
+// Helper function to add referral to daily points
+async function addReferral(userId) {
+  try {
+    const dailyPoint = await DailyPoint.findOne({ user: userId });
+    if (!dailyPoint) {
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (dailyPoint.lastReferralReset < today) {
+      dailyPoint.dailyReferrals = 1;
+      dailyPoint.lastReferralReset = today;
+    } else {
+      dailyPoint.dailyReferrals += 1;
+    }
+
+    await dailyPoint.save();
+  } catch (error) {
+    console.error('Error adding referral:', error);
+  }
+}
+
+// Claim daily points
+exports.claimDailyPoints = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+
+    const user = await User.findOne({ telegramUserId });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    let dailyPoint = await DailyPoint.findOne({ user: user._id });
+    if (!dailyPoint) {
+      dailyPoint = new DailyPoint({ user: user._id });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (dailyPoint.lastClaimDate && dailyPoint.lastClaimDate.getTime() === today.getTime()) {
+      return res.status(400).json({ message: 'Daily points already claimed today' });
+    }
+
+    if (!dailyPoint.lastClaimDate || dailyPoint.lastClaimDate.getTime() < today.getTime() - 86400000) {
+      // Reset streak if it's been more than a day since last claim
+      dailyPoint.currentStreak = 0;
+      dailyPoint.nextClaimAmount = 1000;
+    }
+
+    // Check for referral bonus
+    let bonusMultiplier = 1;
+    if (dailyPoint.dailyReferrals > 2) {
+      bonusMultiplier = 2;
+    }
+
+    // Claim points
+    const claimedAmount = dailyPoint.nextClaimAmount * bonusMultiplier;
+    user.addEarnings(claimedAmount);
+    await user.save();
+
+    // Update daily point record
+    dailyPoint.currentStreak += 1;
+    dailyPoint.lastClaimDate = today;
+    dailyPoint.nextClaimAmount = Math.min(dailyPoint.currentStreak * 1000, 30000);
+    dailyPoint.dailyReferrals = 0; // Reset daily referrals
+    dailyPoint.lastReferralReset = today;
+    await dailyPoint.save();
+
+    res.status(200).json({
+      message: 'Daily points claimed successfully',
+      claimedAmount,
+      currentStreak: dailyPoint.currentStreak,
+      nextClaimAmount: dailyPoint.nextClaimAmount,
+      newBalance: user.balance,
+      bonusApplied: bonusMultiplier > 1
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+// Get daily point status
+exports.getDailyPointStatus = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+
+    const user = await User.findOne({ telegramUserId });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    let dailyPoint = await DailyPoint.findOne({ user: user._id });
+    if (!dailyPoint) {
+      dailyPoint = new DailyPoint({ user: user._id });
+      await dailyPoint.save();
+    }
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const canClaimToday = !dailyPoint.lastClaimDate || dailyPoint.lastClaimDate < today;
+
+    res.status(200).json({
+      currentStreak: dailyPoint.currentStreak,
+      nextClaimAmount: dailyPoint.nextClaimAmount,
+      lastClaimDate: dailyPoint.lastClaimDate,
+      canClaimToday,
+      dailyReferrals: dailyPoint.dailyReferrals,
+      bonusEligible: dailyPoint.dailyReferrals > 2
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
 
 // Get all referrals for a user
 exports.getUserReferrals = async (req, res) => {
@@ -154,7 +278,6 @@ exports.playGame = async (req, res) => {
   }
 };
 
-
 // Update wallet address using username
 exports.updateWalletAddress = async (req, res) => {
   try {
@@ -187,7 +310,6 @@ exports.updateWalletAddress = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 // Get wallet address using username
 exports.getWalletAddress = async (req, res) => {
@@ -232,8 +354,6 @@ exports.getAllUsersWithWallets = async (req, res) => {
   }
 };
 
-
-
 exports.getRoleDetails = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
@@ -271,9 +391,6 @@ exports.getRoleDetails = async (req, res) => {
     handleError(res, error);
   }
 };
-
-
-
 
 // Complete a task
 exports.completeTask = async (req, res) => {
@@ -316,7 +433,7 @@ exports.completeTask = async (req, res) => {
   }
 };
 
-// Get completed tasks
+// Get completed tasks (continued)
 exports.getCompletedTasks = async (req, res) => {
   try {
     const { userId } = req.params;
