@@ -4,6 +4,7 @@ const taskController = require('../controller/taskController');
 const userController = require('../controller/userController');
 const stakeController = require('../controller/stakeController');
 const leaderboardController = require('../controller/leaderboardController');
+const dailyPointController = require('../controller/dailyPointController');
 
 // Middleware to check if user is owner (you'll need to implement this)
 const isOwner = (req, res, next) => {
@@ -51,6 +52,7 @@ router.post('/unstake', stakeController.unstake);
 router.get('/active/:userId', stakeController.getActiveStakes);
 router.get('/claimable/:userId', stakeController.getClaimableStakes);
 
-
+router.post('/claim-daily-points/:telegramUserId', dailyPointController.claimDailyPoints);
+router.get('/daily-point-status/:telegramUserId', dailyPointController.getDailyPointStatus);
 
 module.exports = router;
