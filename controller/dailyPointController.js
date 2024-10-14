@@ -1,5 +1,5 @@
 const DailyPoint = require('../models/DailyPoint');
-const User = require('../models/User');
+const { User } = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 
