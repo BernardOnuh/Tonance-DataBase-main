@@ -32,7 +32,10 @@ const StakeSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'claimed', 'unstaked'],
     default: 'active'
-  }
+  },
+  appliedPromoCodes: [{
+    type: String
+  }],
 }, { timestamps: true });
 
 const UserSchema = new mongoose.Schema({
@@ -322,8 +325,56 @@ UserSchema.methods.setWalletAddress = function(address) {
 UserSchema.methods.getWalletAddress = function() {
   return this.walletAddress;
 };
+// Add this new schema for promo codes
+const PromoCodeSchema = new mongoose.Schema({
+  code: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  pointsBoost: {
+    type: Number,
+    required: true,
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  expirationDate: {
+    type: Date,
+  },
+}, { timestamps: true });
+
+// Add this method to the UserSchema
+UserSchema.methods.applyPromoCode = async function(promoCode) {
+  // Check if the promo code has already been applied
+  if (this.appliedPromoCodes.includes(promoCode)) {
+    throw new Error('Promo code has already been applied');
+  }
+
+  // Find the promo code in the database
+  const promoCodeDoc = await mongoose.model('PromoCode').findOne({ code: promoCode, isActive: true });
+
+  if (!promoCodeDoc) {
+    throw new Error('Invalid or inactive promo code');
+  }
+
+  // Check if the promo code has expired
+  if (promoCodeDoc.expirationDate && promoCodeDoc.expirationDate < new Date()) {
+    throw new Error('Promo code has expired');
+  }
+
+  // Apply the promo code
+  this.balance += promoCodeDoc.pointsBoost;
+  this.appliedPromoCodes.push(promoCode);
+
+  await this.save();
+
+  return promoCodeDoc.pointsBoost;
+};
 
 const User = mongoose.model('User', UserSchema);
 const Stake = mongoose.model('Stake', StakeSchema);
+const PromoCode = mongoose.model('PromoCode', PromoCodeSchema);
 
-module.exports = { User, Stake };
+module.exports = { User, Stake, PromoCode };

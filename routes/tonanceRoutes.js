@@ -54,5 +54,7 @@ router.get('/claimable/:userId', stakeController.getClaimableStakes);
 
 router.post('/claim-daily-points/:telegramUserId', dailyPointController.claimDailyPoints);
 router.get('/daily-point-status/:telegramUserId', dailyPointController.getDailyPointStatus);
+router.post('/apply-promo-code', userController.applyPromoCode);
+router.post('/create-promo-code', userController.createPromoCode);
 
 module.exports = router;

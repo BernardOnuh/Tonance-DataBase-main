@@ -572,3 +572,57 @@ exports.getTotalStats = async (req, res) => {
     handleError(res, error);
   }
 };
+
+exports.applyPromoCode = async (req, res) => {
+  try {
+    const { telegramUserId, promoCode } = req.body;
+
+    const user = await User.findByTelegramUserId(telegramUserId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const pointsAdded = await user.applyPromoCode(promoCode);
+
+    res.status(200).json({
+      message: 'Promo code applied successfully',
+      pointsAdded,
+      newBalance: user.balance
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.createPromoCode = async (req, res) => {
+  try {
+    const { code, pointsBoost, isActive, expirationDate } = req.body;
+
+    // Validate input
+    if (!code || !pointsBoost) {
+      return res.status(400).json({ message: 'Code and pointsBoost are required' });
+    }
+
+    // Check if promo code already exists
+    const existingPromoCode = await PromoCode.findOne({ code });
+    if (existingPromoCode) {
+      return res.status(400).json({ message: 'Promo code already exists' });
+    }
+
+    const newPromoCode = new PromoCode({
+      code,
+      pointsBoost,
+      isActive: isActive !== undefined ? isActive : true,
+      expirationDate: expirationDate ? new Date(expirationDate) : undefined
+    });
+
+    await newPromoCode.save();
+
+    res.status(201).json({
+      message: 'Promo code created successfully',
+      promoCode: newPromoCode
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating promo code', error: error.message });
+  }
+}
