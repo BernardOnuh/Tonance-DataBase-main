@@ -1,4 +1,4 @@
-const { User, Stake } = require('../models/User');
+const { User, Stake, PromoCode } = require('../models/User');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 const Task = require('../models/Task');
