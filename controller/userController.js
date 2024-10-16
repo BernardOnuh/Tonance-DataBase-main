@@ -577,12 +577,49 @@ exports.applyPromoCode = async (req, res) => {
   try {
     const { telegramUserId, promoCode } = req.body;
 
-    const user = await User.findByTelegramUserId(telegramUserId);
+    // Input validation
+    if (!telegramUserId || !promoCode) {
+      return res.status(400).json({ message: 'Telegram User ID and promo code are required' });
+    }
+
+    // Find user
+    const user = await User.findOne({ telegramUserId });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const pointsAdded = await user.applyPromoCode(promoCode);
+    // Find promo code
+    const promoCodeDoc = await PromoCode.findOne({ code: promoCode });
+    if (!promoCodeDoc) {
+      return res.status(404).json({ message: 'Promo code not found' });
+    }
+
+    // Check if promo code is active
+    if (!promoCodeDoc.isActive) {
+      return res.status(400).json({ message: 'Promo code is not active' });
+    }
+
+    // Check if promo code has expired
+    if (promoCodeDoc.expirationDate && promoCodeDoc.expirationDate < new Date()) {
+      return res.status(400).json({ message: 'Promo code has expired' });
+    }
+
+    // Check if user has already used this promo code
+    if (user.usedPromoCodes && user.usedPromoCodes.includes(promoCodeDoc._id)) {
+      return res.status(400).json({ message: 'You have already used this promo code' });
+    }
+
+    // Apply promo code
+    const pointsAdded = promoCodeDoc.pointsBoost;
+    user.balance += pointsAdded;
+
+    // Add promo code to user's used promo codes
+    if (!user.usedPromoCodes) {
+      user.usedPromoCodes = [];
+    }
+    user.usedPromoCodes.push(promoCodeDoc._id);
+
+    await user.save();
 
     res.status(200).json({
       message: 'Promo code applied successfully',
@@ -590,7 +627,8 @@ exports.applyPromoCode = async (req, res) => {
       newBalance: user.balance
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error('Error applying promo code:', error);
+    res.status(500).json({ message: 'An error occurred while applying the promo code' });
   }
 };
 
@@ -625,4 +663,4 @@ exports.createPromoCode = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error creating promo code', error: error.message });
   }
-}
+} 
