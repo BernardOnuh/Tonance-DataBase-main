@@ -27,8 +27,11 @@ exports.claimDailyPoints = async (req, res) => {
     if (!dailyPoint.lastClaimDate || dailyPoint.lastClaimDate.getTime() < today.getTime() - 86400000) {
       // Reset streak if it's been more than a day since last claim
       dailyPoint.currentStreak = 0;
-      dailyPoint.nextClaimAmount = 1000;
     }
+    
+    // Increment streak and calculate claim amount
+    dailyPoint.currentStreak += 1;
+    const claimAmount = Math.min(dailyPoint.currentStreak * 1000, 30000);
     
     // Check for referral bonus
     let bonusMultiplier = 1;
@@ -37,14 +40,13 @@ exports.claimDailyPoints = async (req, res) => {
     }
     
     // Claim points
-    const claimedAmount = dailyPoint.nextClaimAmount * bonusMultiplier;
+    const claimedAmount = claimAmount * bonusMultiplier;
     user.addEarnings(claimedAmount);
     await user.save();
     
     // Update daily point record
-    dailyPoint.currentStreak += 1;
     dailyPoint.lastClaimDate = today;
-    dailyPoint.nextClaimAmount = Math.min(dailyPoint.currentStreak * 1000, 30000);
+    dailyPoint.nextClaimAmount = Math.min((dailyPoint.currentStreak + 1) * 1000, 30000);
     dailyPoint.dailyReferrals = 0; // Reset daily referrals
     dailyPoint.lastReferralReset = today;
     await dailyPoint.save();
@@ -62,6 +64,7 @@ exports.claimDailyPoints = async (req, res) => {
     res.status(500).json({ message: 'An error occurred', error: error.message });
   }
 };
+
 
 exports.getDailyPointStatus = async (req, res) => {
   try {
@@ -82,19 +85,33 @@ exports.getDailyPointStatus = async (req, res) => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const canClaimToday = !dailyPoint.lastClaimDate || dailyPoint.lastClaimDate < today;
     
+    let nextClaimAmount;
+    if (canClaimToday) {
+      // If user can claim today, calculate the next claim amount based on the current streak + 1
+      nextClaimAmount = Math.min((dailyPoint.currentStreak + 1) * 1000, 30000);
+    } else {
+      // If user has already claimed today, show the next day's potential claim amount
+      nextClaimAmount = Math.min((dailyPoint.currentStreak + 1) * 1000, 30000);
+    }
+    
+    // Calculate days until max streak (30 days)
+    const daysUntilMaxStreak = Math.max(30 - dailyPoint.currentStreak, 0);
+    
     res.status(200).json({
       currentStreak: dailyPoint.currentStreak,
-      nextClaimAmount: dailyPoint.nextClaimAmount,
+      nextClaimAmount,
       lastClaimDate: dailyPoint.lastClaimDate,
       canClaimToday,
       dailyReferrals: dailyPoint.dailyReferrals,
-      bonusEligible: dailyPoint.dailyReferrals > 2
+      bonusEligible: dailyPoint.dailyReferrals > 2,
+      daysUntilMaxStreak
     });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ message: 'An error occurred', error: error.message });
   }
 };
+
 
 exports.addReferral = async (userId) => {
   try {
