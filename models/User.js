@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Task = mongoose.model('Task', TaskSchema);
 
 // Define StakeSchema
 const StakeSchema = new mongoose.Schema({
@@ -355,7 +356,16 @@ const PromoCodeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+
 UserSchema.methods.applyPromoCode = async function(promoCode) {
+  // Check if all tasks are completed
+  const allTasks = await Task.find({ isActive: true });
+  const completedTasksCount = this.tasksCompleted.length;
+
+  if (completedTasksCount < allTasks.length) {
+    throw new Error('You must complete all available tasks before using a promo code');
+  }
+
   // Find the promo code in the database
   const promoCodeDoc = await PromoCode.findOne({ code: promoCode, isActive: true });
 
