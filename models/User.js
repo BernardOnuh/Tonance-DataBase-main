@@ -111,6 +111,16 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  usedPromoCodes: [{
+    promoCode: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PromoCode'
+    },
+    usedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
 }, { timestamps: true });
 
 // Static method to find a user by telegramUserId
@@ -345,15 +355,9 @@ const PromoCodeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Add this method to the UserSchema
 UserSchema.methods.applyPromoCode = async function(promoCode) {
-  // Check if the promo code has already been applied
-  if (this.appliedPromoCodes.includes(promoCode)) {
-    throw new Error('Promo code has already been applied');
-  }
-
   // Find the promo code in the database
-  const promoCodeDoc = await mongoose.model('PromoCode').findOne({ code: promoCode, isActive: true });
+  const promoCodeDoc = await PromoCode.findOne({ code: promoCode, isActive: true });
 
   if (!promoCodeDoc) {
     throw new Error('Invalid or inactive promo code');
@@ -364,9 +368,24 @@ UserSchema.methods.applyPromoCode = async function(promoCode) {
     throw new Error('Promo code has expired');
   }
 
+  // Check if user has used this promo code in the last 24 hours
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentUse = this.usedPromoCodes.find(usage => 
+    usage.promoCode.equals(promoCodeDoc._id) && usage.usedAt > twentyFourHoursAgo
+  );
+
+  if (recentUse) {
+    const timeLeft = new Date(recentUse.usedAt.getTime() + 24 * 60 * 60 * 1000) - new Date();
+    const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
+    throw new Error(`You can use this promo code again in ${hoursLeft} hours`);
+  }
+
   // Apply the promo code
   this.balance += promoCodeDoc.pointsBoost;
-  this.appliedPromoCodes.push(promoCode);
+  this.usedPromoCodes.push({
+    promoCode: promoCodeDoc._id,
+    usedAt: new Date()
+  });
 
   await this.save();
 

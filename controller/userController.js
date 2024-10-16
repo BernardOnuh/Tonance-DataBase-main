@@ -604,20 +604,32 @@ exports.applyPromoCode = async (req, res) => {
       return res.status(400).json({ message: 'Promo code has expired' });
     }
 
-    // Check if user has already used this promo code
-    if (user.usedPromoCodes && user.usedPromoCodes.includes(promoCodeDoc._id)) {
-      return res.status(400).json({ message: 'You have already used this promo code' });
+    // Check if user has used this promo code in the last 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentUse = user.usedPromoCodes && user.usedPromoCodes.find(usage => 
+      usage.promoCode.equals(promoCodeDoc._id) && usage.usedAt > twentyFourHoursAgo
+    );
+
+    if (recentUse) {
+      const timeLeft = new Date(recentUse.usedAt.getTime() + 24 * 60 * 60 * 1000) - new Date();
+      const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
+      return res.status(400).json({ 
+        message: `You can use this promo code again in ${hoursLeft} hours` 
+      });
     }
 
     // Apply promo code
     const pointsAdded = promoCodeDoc.pointsBoost;
     user.balance += pointsAdded;
 
-    // Add promo code to user's used promo codes
+    // Update user's used promo codes
     if (!user.usedPromoCodes) {
       user.usedPromoCodes = [];
     }
-    user.usedPromoCodes.push(promoCodeDoc._id);
+    user.usedPromoCodes.push({
+      promoCode: promoCodeDoc._id,
+      usedAt: new Date()
+    });
 
     await user.save();
 
