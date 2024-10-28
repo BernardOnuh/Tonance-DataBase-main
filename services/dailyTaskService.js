@@ -42,7 +42,7 @@ class DailyTaskService {
     }
   }
 
-  static async getAllDailyTasks(page = 1, limit = 10) {
+  static async getAllDailyTasks(page = 1, limit = 32) {
     try {
       const skip = (page - 1) * limit;
       const tasks = await DailyTask.find()
