@@ -32,7 +32,7 @@ class DailyTaskController {
   static async getAllDailyTasks(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 32;
       const tasks = await DailyTaskService.getAllDailyTasks(page, limit);
       res.json(tasks);
     } catch (error) {
@@ -61,7 +61,7 @@ class DailyTaskController {
   static async getCompletionHistory(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
+      const limit = parseInt(req.query.limit) || 32;
       const history = await DailyTaskService.getCompletionHistory(req.params.userId, page, limit);
       res.json(history);
     } catch (error) {
