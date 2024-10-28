@@ -142,7 +142,7 @@ class DailyTaskService {
     }
   }
 
-  static async getCompletionHistory(userId, page = 1, limit = 10) {
+  static async getCompletionHistory(userId, page = 1, limit = 32) {
     try {
       const skip = (page - 1) * limit;
       
