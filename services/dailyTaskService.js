@@ -1,5 +1,5 @@
 // services/dailyTaskService.js
-const DailyTask = require('../models/dailyTask');
+const DailyTask = require('../models/DailyTask');
 const DailyCompletedTask = require('../models/DailyCompletedTask');
 const Streak = require('../models/Streak');
 const User = require('../models/User');
