@@ -5,6 +5,8 @@ const userController = require('../controller/userController');
 const stakeController = require('../controller/stakeController');
 const leaderboardController = require('../controller/leaderboardController');
 const dailyPointController = require('../controller/dailyPointController');
+const DailyTaskController = require('../controller/dailyTaskController');
+
 
 // Middleware to check if user is owner (you'll need to implement this)
 const isOwner = (req, res, next) => {
@@ -56,5 +58,18 @@ router.post('/claim-daily-points/:telegramUserId', dailyPointController.claimDai
 router.get('/daily-point-status/:telegramUserId', dailyPointController.getDailyPointStatus);
 router.post('/apply-promo-code', userController.applyPromoCode);
 router.post('/create-promo-code', userController.createPromoCode);
+
+// Task management routes
+router.post('/daily-tasks', DailyTaskController.createDailyTask);
+router.put('/daily-tasks/:taskId', DailyTaskController.updateDailyTask);
+router.delete('/daily-tasks/:taskId', DailyTaskController.deleteDailyTask);
+router.get('/daily-tasks', DailyTaskController.getAllDailyTasks);
+router.get('/daily-tasks/:taskId', DailyTaskController.getDailyTaskById);
+
+// User interaction routes
+router.post('/complete/:userId/:taskId', DailyTaskController.completeDaily);
+router.get('/history/:userId', DailyTaskController.getCompletionHistory);
+router.get('/streak/:userId', DailyTaskController.getStreakStatus);
+
 
 module.exports = router;
