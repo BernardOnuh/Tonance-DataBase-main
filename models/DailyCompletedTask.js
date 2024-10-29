@@ -1,11 +1,10 @@
-// models/dailyCompletedTask.js
 const mongoose = require('mongoose');
 
 const DailyCompletedTaskSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    type: String,  // Changed to String to store Discord user IDs
+    required: true,
+    index: true
   },
   dailyTaskId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -31,6 +30,5 @@ const DailyCompletedTaskSchema = new mongoose.Schema({
 // Add compound index for better query performance
 DailyCompletedTaskSchema.index({ userId: 1, completedAt: -1 });
 
-// Safe model registration
 module.exports = mongoose.models.DailyCompletedTask || 
   mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
