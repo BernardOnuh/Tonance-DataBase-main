@@ -24,6 +24,13 @@ const DailyCompletedTaskSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  timestamps: true
 });
 
-module.exports = mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
+// Add compound index for better query performance
+DailyCompletedTaskSchema.index({ userId: 1, completedAt: -1 });
+
+// Safe model registration
+module.exports = mongoose.models.DailyCompletedTask || 
+  mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
