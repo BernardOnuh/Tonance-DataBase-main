@@ -88,17 +88,18 @@ class DailyTaskController {
     try {
       const { userId, taskId } = req.params;
 
-      // Validate both IDs
+      // Validate taskId as ObjectId
       if (!ObjectId.isValid(taskId)) {
         return res.status(400).json({ error: 'Invalid taskId format' });
       }
 
-      if (!ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid userId format' });
+      // Validate Telegram userId format (9-10 digits)
+      if (!userId || !/^\d{9,10}$/.test(userId)) {
+        return res.status(400).json({ error: 'Invalid Telegram userId format. Expected 9-10 digit Telegram ID' });
       }
 
       const result = await DailyTaskService.completeDaily(
-        new ObjectId(userId),
+        userId,
         new ObjectId(taskId)
       );
       
@@ -112,15 +113,16 @@ class DailyTaskController {
     try {
       const { userId } = req.params;
 
-      if (!ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid userId format' });
+      // Validate Telegram userId format
+      if (!userId || !/^\d{9,10}$/.test(userId)) {
+        return res.status(400).json({ error: 'Invalid Telegram userId format. Expected 9-10 digit Telegram ID' });
       }
 
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       
       const history = await DailyTaskService.getCompletionHistory(
-        new ObjectId(userId),
+        userId,
         page,
         limit
       );
@@ -135,14 +137,12 @@ class DailyTaskController {
     try {
       const { userId } = req.params;
 
-      if (!ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid userId format' });
+      // Validate Telegram userId format
+      if (!userId || !/^\d{9,10}$/.test(userId)) {
+        return res.status(400).json({ error: 'Invalid Telegram userId format. Expected 9-10 digit Telegram ID' });
       }
 
-      const status = await DailyTaskService.getStreakStatus(
-        new ObjectId(userId)
-      );
-      
+      const status = await DailyTaskService.getStreakStatus(userId);
       res.json(status);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -153,15 +153,16 @@ class DailyTaskController {
     try {
       const { userId } = req.params;
 
-      if (!ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid userId format' });
+      // Validate Telegram userId format
+      if (!userId || !/^\d{9,10}$/.test(userId)) {
+        return res.status(400).json({ error: 'Invalid Telegram userId format. Expected 9-10 digit Telegram ID' });
       }
 
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       
       const tasks = await DailyTaskService.getUserDailyTasks(
-        new ObjectId(userId),
+        userId,
         page,
         limit
       );
@@ -176,14 +177,12 @@ class DailyTaskController {
     try {
       const { userId } = req.params;
 
-      if (!ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid userId format' });
+      // Validate Telegram userId format
+      if (!userId || !/^\d{9,10}$/.test(userId)) {
+        return res.status(400).json({ error: 'Invalid Telegram userId format. Expected 9-10 digit Telegram ID' });
       }
 
-      const stats = await DailyTaskService.getTaskStats(
-        new ObjectId(userId)
-      );
-      
+      const stats = await DailyTaskService.getTaskStats(userId);
       res.json(stats);
     } catch (error) {
       res.status(400).json({ error: error.message });
