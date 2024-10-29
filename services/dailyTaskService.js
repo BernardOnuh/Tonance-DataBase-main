@@ -82,6 +82,10 @@ class DailyTaskService {
         throw new Error('Invalid dailyTaskId format');
       }
 
+      // Find user by telegramId
+      const user = await User.findOne({ telegramId: userId.toString() });
+      if (!user) throw new Error('User not found');
+
       // Find or create streak with string userId
       const streak = await Streak.findOne({ userId: userId.toString() }) || 
                     new Streak({ userId: userId.toString() });
@@ -126,11 +130,8 @@ class DailyTaskService {
         points: getDailyPoints(streak.currentStreak)
       });
 
-      // Update user balance - Note: User model might still use ObjectId
-      const user = await User.findById(userId.toString());
-      if (!user) throw new Error('User not found');
-
-      user.balance += completedTask.points;
+      // Update user balance
+      user.balance = (user.balance || 0) + completedTask.points;
 
       // Save all changes
       await Promise.all([
