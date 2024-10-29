@@ -1,7 +1,7 @@
 const DailyTask = require('../models/DailyTask');
 const DailyCompletedTask = require('../models/DailyCompletedTask');
 const Streak = require('../models/Streak');
-const { User } = require('../models/User'); // Update this line to destructure User from the export
+const { User } = require('../models/User');
 const mongoose = require('mongoose');
 const { areConsecutiveDays, getDailyPoints } = require('../utils/streakUtils');
 
@@ -81,23 +81,21 @@ class DailyTaskService {
         throw new Error('Invalid dailyTaskId format');
       }
 
-      // Use telegramUserId instead of telegramId to match the schema
+      // Find user by telegramUserId
       const user = await User.findOne({ telegramUserId: userId.toString() });
       if (!user) throw new Error('User not found');
 
-      const streak = await Streak.findOne({ userId: userId.toString() }) || 
-                    new Streak({ userId: userId.toString() });
-                    
+      // Find task
       const task = await DailyTask.findById(dailyTaskId);
-      const now = new Date();
-
       if (!task) throw new Error('Daily task not found');
 
+      const now = new Date();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(now);
       todayEnd.setHours(23, 59, 59, 999);
 
+      // Check for existing completion today
       const existingCompletion = await DailyCompletedTask.findOne({
         userId: userId.toString(),
         completedAt: { $gte: todayStart, $lte: todayEnd }
@@ -107,6 +105,17 @@ class DailyTaskService {
         throw new Error('You have already completed a daily task today');
       }
 
+      // Find or create streak
+      let streak = await Streak.findOne({ userId: userId.toString() });
+      if (!streak) {
+        streak = new Streak({ 
+          userId: userId.toString(),
+          currentStreak: 0,
+          highestStreak: 0
+        });
+      }
+
+      // Update streak
       if (!streak.lastCheckIn) {
         streak.currentStreak = 1;
       } else if (areConsecutiveDays(streak.lastCheckIn, now)) {
@@ -118,18 +127,31 @@ class DailyTaskService {
       streak.highestStreak = Math.max(streak.highestStreak, streak.currentStreak);
       streak.lastCheckIn = now;
 
+      // Calculate points based on streak
+      const earnedPoints = getDailyPoints(streak.currentStreak);
+      if (typeof earnedPoints !== 'number' || isNaN(earnedPoints)) {
+        throw new Error('Invalid points calculation');
+      }
+
+      // Create completed task record
       const completedTask = new DailyCompletedTask({
         userId: userId.toString(),
-        dailyTaskId,
+        dailyTaskId: dailyTaskId,
         streakDay: streak.currentStreak,
-        points: getDailyPoints(streak.currentStreak)
+        points: earnedPoints,
+        completedAt: now
       });
 
-      // Update user balance and total earnings
-      user.balance = (user.balance || 0) + completedTask.points;
-      user.totalEarnings = (user.totalEarnings || 0) + completedTask.points;
-      user.tasksCompleted.push(dailyTaskId);
+      // Update user balance and stats
+      user.balance = (user.balance || 0) + earnedPoints;
+      user.totalEarnings = (user.totalEarnings || 0) + earnedPoints;
+      
+      // Add to tasks completed if not already included
+      if (!user.tasksCompleted.includes(dailyTaskId)) {
+        user.tasksCompleted.push(dailyTaskId);
+      }
 
+      // Save all changes
       await Promise.all([
         completedTask.save(),
         streak.save(),
@@ -138,7 +160,7 @@ class DailyTaskService {
 
       return {
         streakDay: streak.currentStreak,
-        points: completedTask.points,
+        points: earnedPoints,
         totalBalance: user.balance,
         highestStreak: streak.highestStreak
       };
@@ -177,10 +199,17 @@ class DailyTaskService {
 
   static async getStreakStatus(userId) {
     try {
-      const streak = await Streak.findOne({ userId: userId.toString() }) || 
-                    new Streak({ userId: userId.toString() });
+      let streak = await Streak.findOne({ userId: userId.toString() });
+      if (!streak) {
+        streak = new Streak({ 
+          userId: userId.toString(),
+          currentStreak: 0,
+          highestStreak: 0
+        });
+        await streak.save();
+      }
+
       const now = new Date();
-      
       const isStreakActive = streak.lastCheckIn && 
         areConsecutiveDays(streak.lastCheckIn, now);
 
@@ -193,6 +222,40 @@ class DailyTaskService {
       };
     } catch (error) {
       throw new Error(`Error fetching streak status: ${error.message}`);
+    }
+  }
+
+  static async getUserDailyTasks(userId, page = 1, limit = 32) {
+    try {
+      const user = await User.findOne({ telegramUserId: userId.toString() })
+        .populate('tasksCompleted');
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const skip = (page - 1) * limit;
+      const completedTaskIds = user.tasksCompleted.map(task => task._id);
+
+      const tasks = await DailyTask.find({
+        _id: { $in: completedTaskIds }
+      })
+        .sort({ completedAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const total = completedTaskIds.length;
+
+      return {
+        tasks,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalItems: total
+        }
+      };
+    } catch (error) {
+      throw new Error(`Error fetching user daily tasks: ${error.message}`);
     }
   }
 }

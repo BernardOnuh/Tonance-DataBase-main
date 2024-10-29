@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const DailyCompletedTaskSchema = new mongoose.Schema({
   userId: {
-    type: String,  // Changed to String to store Discord user IDs
+    type: String,  // Store as string for Telegram IDs
     required: true,
     index: true
   },
@@ -13,15 +13,18 @@ const DailyCompletedTaskSchema = new mongoose.Schema({
   },
   streakDay: {
     type: Number,
-    required: true
+    required: true,
+    min: 1
   },
   points: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   completedAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    required: true
   }
 }, {
   timestamps: true
