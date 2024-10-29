@@ -1,7 +1,7 @@
 const DailyTask = require('../models/DailyTask');
 const DailyCompletedTask = require('../models/DailyCompletedTask');
 const Streak = require('../models/Streak');
-const User = require('../models/User');
+const { User } = require('../models/User'); // Update this line to destructure User from the export
 const mongoose = require('mongoose');
 const { areConsecutiveDays, getDailyPoints } = require('../utils/streakUtils');
 
@@ -77,16 +77,14 @@ class DailyTaskService {
 
   static async completeDaily(userId, dailyTaskId) {
     try {
-      // Handle userId as string and convert taskId to ObjectId
       if (!mongoose.Types.ObjectId.isValid(dailyTaskId)) {
         throw new Error('Invalid dailyTaskId format');
       }
 
-      // Find user by telegramId
-      const user = await User.findOne({ telegramId: userId.toString() });
+      // Use telegramUserId instead of telegramId to match the schema
+      const user = await User.findOne({ telegramUserId: userId.toString() });
       if (!user) throw new Error('User not found');
 
-      // Find or create streak with string userId
       const streak = await Streak.findOne({ userId: userId.toString() }) || 
                     new Streak({ userId: userId.toString() });
                     
@@ -95,7 +93,6 @@ class DailyTaskService {
 
       if (!task) throw new Error('Daily task not found');
 
-      // Check if task was already completed today
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(now);
@@ -110,7 +107,6 @@ class DailyTaskService {
         throw new Error('You have already completed a daily task today');
       }
 
-      // Update streak
       if (!streak.lastCheckIn) {
         streak.currentStreak = 1;
       } else if (areConsecutiveDays(streak.lastCheckIn, now)) {
@@ -122,7 +118,6 @@ class DailyTaskService {
       streak.highestStreak = Math.max(streak.highestStreak, streak.currentStreak);
       streak.lastCheckIn = now;
 
-      // Create completed task record with string userId
       const completedTask = new DailyCompletedTask({
         userId: userId.toString(),
         dailyTaskId,
@@ -130,10 +125,11 @@ class DailyTaskService {
         points: getDailyPoints(streak.currentStreak)
       });
 
-      // Update user balance
+      // Update user balance and total earnings
       user.balance = (user.balance || 0) + completedTask.points;
+      user.totalEarnings = (user.totalEarnings || 0) + completedTask.points;
+      user.tasksCompleted.push(dailyTaskId);
 
-      // Save all changes
       await Promise.all([
         completedTask.save(),
         streak.save(),
