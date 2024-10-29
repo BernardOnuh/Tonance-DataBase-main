@@ -1,4 +1,3 @@
-const DailyTaskService = require('../services/dailyTaskService');
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -14,7 +13,19 @@ class DailyTaskController {
 
   static async updateDailyTask(req, res) {
     try {
-      const task = await DailyTaskService.updateDailyTask(req.params.taskId, req.body);
+      if (!ObjectId.isValid(req.params.taskId)) {
+        return res.status(400).json({ error: 'Invalid taskId format' });
+      }
+
+      const task = await DailyTaskService.updateDailyTask(
+        new ObjectId(req.params.taskId), 
+        req.body
+      );
+      
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      
       res.json(task);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -23,8 +34,19 @@ class DailyTaskController {
 
   static async deleteDailyTask(req, res) {
     try {
-      const result = await DailyTaskService.deleteDailyTask(req.params.taskId);
-      res.json(result);
+      if (!ObjectId.isValid(req.params.taskId)) {
+        return res.status(400).json({ error: 'Invalid taskId format' });
+      }
+
+      const result = await DailyTaskService.deleteDailyTask(
+        new ObjectId(req.params.taskId)
+      );
+      
+      if (!result) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      
+      res.json({ message: 'Task deleted successfully' });
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
@@ -34,6 +56,7 @@ class DailyTaskController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
+      
       const tasks = await DailyTaskService.getAllDailyTasks(page, limit);
       res.json(tasks);
     } catch (error) {
@@ -46,7 +69,15 @@ class DailyTaskController {
       if (!ObjectId.isValid(req.params.taskId)) {
         return res.status(400).json({ error: 'Invalid taskId format' });
       }
-      const task = await DailyTaskService.getDailyTaskById(req.params.taskId);
+
+      const task = await DailyTaskService.getDailyTaskById(
+        new ObjectId(req.params.taskId)
+      );
+      
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      
       res.json(task);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -55,19 +86,22 @@ class DailyTaskController {
 
   static async completeDaily(req, res) {
     try {
-      const userId = req.params.userId;
-      
-      // Validate taskId is a valid ObjectId
-      if (!ObjectId.isValid(req.params.taskId)) {
+      const { userId, taskId } = req.params;
+
+      // Validate both IDs
+      if (!ObjectId.isValid(taskId)) {
         return res.status(400).json({ error: 'Invalid taskId format' });
       }
 
-      // Validate userId is a number
-      if (isNaN(userId) || parseInt(userId) <= 0) {
-        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      if (!ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
       }
 
-      const result = await DailyTaskService.completeDaily(userId.toString(), req.params.taskId);
+      const result = await DailyTaskService.completeDaily(
+        new ObjectId(userId),
+        new ObjectId(taskId)
+      );
+      
       res.json(result);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -76,16 +110,21 @@ class DailyTaskController {
 
   static async getCompletionHistory(req, res) {
     try {
-      const userId = req.params.userId;
-      
-      // Validate userId is a number
-      if (isNaN(userId) || parseInt(userId) <= 0) {
-        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      const { userId } = req.params;
+
+      if (!ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
       }
 
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      const history = await DailyTaskService.getCompletionHistory(userId.toString(), page, limit);
+      
+      const history = await DailyTaskService.getCompletionHistory(
+        new ObjectId(userId),
+        page,
+        limit
+      );
+      
       res.json(history);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -94,15 +133,58 @@ class DailyTaskController {
 
   static async getStreakStatus(req, res) {
     try {
-      const userId = req.params.userId;
-      
-      // Validate userId is a number
-      if (isNaN(userId) || parseInt(userId) <= 0) {
-        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      const { userId } = req.params;
+
+      if (!ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
       }
 
-      const status = await DailyTaskService.getStreakStatus(userId.toString());
+      const status = await DailyTaskService.getStreakStatus(
+        new ObjectId(userId)
+      );
+      
       res.json(status);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async getUserDailyTasks(req, res) {
+    try {
+      const { userId } = req.params;
+
+      if (!ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
+      }
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      
+      const tasks = await DailyTaskService.getUserDailyTasks(
+        new ObjectId(userId),
+        page,
+        limit
+      );
+      
+      res.json(tasks);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  static async getTaskStats(req, res) {
+    try {
+      const { userId } = req.params;
+
+      if (!ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid userId format' });
+      }
+
+      const stats = await DailyTaskService.getTaskStats(
+        new ObjectId(userId)
+      );
+      
+      res.json(stats);
     } catch (error) {
       res.status(400).json({ error: error.message });
     }
