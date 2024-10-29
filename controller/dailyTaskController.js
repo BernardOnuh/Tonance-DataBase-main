@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const ObjectId = mongoose.Types.ObjectId;
-const DailyTaskService = require('../services/DailyTaskService'); // Add this import
+const DailyTaskService = require('../services/dailyTaskService'); 
 
 class DailyTaskController {
   static async createDailyTask(req, res) {
