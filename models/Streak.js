@@ -1,28 +1,33 @@
 const mongoose = require('mongoose');
 
-const StreakSchema = new mongoose.Schema({
+const DailyCompletedTaskSchema = new mongoose.Schema({
   userId: {
     type: String,  // Changed from ObjectId to String
     required: true,
     index: true
   },
-  currentStreak: {
-    type: Number,
-    default: 0
+  dailyTaskId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DailyTask',
+    required: true
   },
-  lastCheckIn: {
+  completedAt: {
     type: Date,
-    default: null
+    default: Date.now
   },
-  highestStreak: {
+  streakDay: {
     type: Number,
-    default: 0
+    required: true
+  },
+  points: {
+    type: Number,
+    required: true
   }
 }, {
   timestamps: true
 });
 
-// Index for performance
-StreakSchema.index({ userId: 1, lastCheckIn: -1 });
+// Compound index for performance
+DailyCompletedTaskSchema.index({ userId: 1, completedAt: -1 });
 
-module.exports = mongoose.model('Streak', StreakSchema);
+module.exports = mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
