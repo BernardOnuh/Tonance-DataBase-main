@@ -30,4 +30,5 @@ const DailyCompletedTaskSchema = new mongoose.Schema({
 // Compound index for performance
 DailyCompletedTaskSchema.index({ userId: 1, completedAt: -1 });
 
-module.exports = mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
+// Safe model registration
+module.exports = mongoose.models.DailyCompletedTask || mongoose.model('DailyCompletedTask', DailyCompletedTaskSchema);
