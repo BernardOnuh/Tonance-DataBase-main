@@ -1,5 +1,7 @@
 // controllers/dailyTaskController.js
 const DailyTaskService = require('../services/dailyTaskService');
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 class DailyTaskController {
   static async createDailyTask(req, res) {
