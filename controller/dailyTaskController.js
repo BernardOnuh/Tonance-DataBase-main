@@ -1,5 +1,6 @@
-// controllers/dailyTaskController.js
 const DailyTaskService = require('../services/dailyTaskService');
+const mongoose = require('mongoose');
+const ObjectId = mongoose.Types.ObjectId;
 
 class DailyTaskController {
   static async createDailyTask(req, res) {
@@ -42,6 +43,9 @@ class DailyTaskController {
 
   static async getDailyTaskById(req, res) {
     try {
+      if (!ObjectId.isValid(req.params.taskId)) {
+        return res.status(400).json({ error: 'Invalid taskId format' });
+      }
       const task = await DailyTaskService.getDailyTaskById(req.params.taskId);
       res.json(task);
     } catch (error) {
@@ -51,7 +55,19 @@ class DailyTaskController {
 
   static async completeDaily(req, res) {
     try {
-      const result = await DailyTaskService.completeDaily(req.params.userId, req.params.taskId);
+      const userId = req.params.userId;
+      
+      // Validate taskId is a valid ObjectId
+      if (!ObjectId.isValid(req.params.taskId)) {
+        return res.status(400).json({ error: 'Invalid taskId format' });
+      }
+
+      // Validate userId is a number
+      if (isNaN(userId) || parseInt(userId) <= 0) {
+        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      }
+
+      const result = await DailyTaskService.completeDaily(userId.toString(), req.params.taskId);
       res.json(result);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -60,9 +76,16 @@ class DailyTaskController {
 
   static async getCompletionHistory(req, res) {
     try {
+      const userId = req.params.userId;
+      
+      // Validate userId is a number
+      if (isNaN(userId) || parseInt(userId) <= 0) {
+        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      }
+
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
-      const history = await DailyTaskService.getCompletionHistory(req.params.userId, page, limit);
+      const history = await DailyTaskService.getCompletionHistory(userId.toString(), page, limit);
       res.json(history);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -71,7 +94,14 @@ class DailyTaskController {
 
   static async getStreakStatus(req, res) {
     try {
-      const status = await DailyTaskService.getStreakStatus(req.params.userId);
+      const userId = req.params.userId;
+      
+      // Validate userId is a number
+      if (isNaN(userId) || parseInt(userId) <= 0) {
+        return res.status(400).json({ error: 'Invalid userId format. Must be a positive number' });
+      }
+
+      const status = await DailyTaskService.getStreakStatus(userId.toString());
       res.json(status);
     } catch (error) {
       res.status(400).json({ error: error.message });

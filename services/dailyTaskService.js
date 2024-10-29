@@ -1,8 +1,8 @@
-// services/dailyTaskService.js
 const DailyTask = require('../models/DailyTask');
 const DailyCompletedTask = require('../models/DailyCompletedTask');
 const Streak = require('../models/Streak');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const { areConsecutiveDays, getDailyPoints } = require('../utils/streakUtils');
 
 class DailyTaskService {
@@ -77,7 +77,15 @@ class DailyTaskService {
 
   static async completeDaily(userId, dailyTaskId) {
     try {
-      const streak = await Streak.findOne({ userId }) || new Streak({ userId });
+      // Handle userId as string and convert taskId to ObjectId
+      if (!mongoose.Types.ObjectId.isValid(dailyTaskId)) {
+        throw new Error('Invalid dailyTaskId format');
+      }
+
+      // Find or create streak with string userId
+      const streak = await Streak.findOne({ userId: userId.toString() }) || 
+                    new Streak({ userId: userId.toString() });
+                    
       const task = await DailyTask.findById(dailyTaskId);
       const now = new Date();
 
@@ -90,7 +98,7 @@ class DailyTaskService {
       todayEnd.setHours(23, 59, 59, 999);
 
       const existingCompletion = await DailyCompletedTask.findOne({
-        userId,
+        userId: userId.toString(),
         completedAt: { $gte: todayStart, $lte: todayEnd }
       });
 
@@ -110,16 +118,16 @@ class DailyTaskService {
       streak.highestStreak = Math.max(streak.highestStreak, streak.currentStreak);
       streak.lastCheckIn = now;
 
-      // Create completed task record
+      // Create completed task record with string userId
       const completedTask = new DailyCompletedTask({
-        userId,
+        userId: userId.toString(),
         dailyTaskId,
         streakDay: streak.currentStreak,
         points: getDailyPoints(streak.currentStreak)
       });
 
-      // Update user balance
-      const user = await User.findById(userId);
+      // Update user balance - Note: User model might still use ObjectId
+      const user = await User.findById(userId.toString());
       if (!user) throw new Error('User not found');
 
       user.balance += completedTask.points;
@@ -147,13 +155,15 @@ class DailyTaskService {
       const skip = (page - 1) * limit;
       
       const completions = await DailyCompletedTask
-        .find({ userId })
+        .find({ userId: userId.toString() })
         .populate('dailyTaskId', 'topic description dayNumber')
         .sort({ completedAt: -1 })
         .skip(skip)
         .limit(limit);
 
-      const total = await DailyCompletedTask.countDocuments({ userId });
+      const total = await DailyCompletedTask.countDocuments({ 
+        userId: userId.toString() 
+      });
 
       return {
         completions,
@@ -170,7 +180,8 @@ class DailyTaskService {
 
   static async getStreakStatus(userId) {
     try {
-      const streak = await Streak.findOne({ userId }) || new Streak({ userId });
+      const streak = await Streak.findOne({ userId: userId.toString() }) || 
+                    new Streak({ userId: userId.toString() });
       const now = new Date();
       
       const isStreakActive = streak.lastCheckIn && 

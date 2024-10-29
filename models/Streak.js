@@ -1,11 +1,10 @@
-// models/Streak.js
 const mongoose = require('mongoose');
 
 const StreakSchema = new mongoose.Schema({
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    type: String,  // Changed from ObjectId to String to handle numeric IDs
+    required: true,
+    index: true
   },
   currentStreak: {
     type: Number,
