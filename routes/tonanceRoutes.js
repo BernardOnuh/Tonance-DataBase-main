@@ -37,6 +37,7 @@ router.put('/wallet-address', userController.updateWalletAddress);
 router.get('/wallet-address', userController.getWalletAddress);
 router.get('/all-users', userController.getAllUsersWithWallets);
 router.post('/users/:telegramUserId/claim-referral-bonus', userController.claimReferralBonus);
+router.get('/users/:telegramUserId/claim-referral-bonus', userController.checkReferralBonusStatus);
 
 
 // Leaderboard routes

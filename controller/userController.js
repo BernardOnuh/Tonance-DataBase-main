@@ -718,3 +718,60 @@ exports.claimReferralBonus = async (req, res) => {
     handleError(res, error);
   }
 };
+
+exports.checkReferralBonusStatus = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    
+    const user = await User.findOne({ telegramUserId })
+      .populate('referrals');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    const BONUS_AMOUNT = 1000000;
+    const currentReferrals = user.referrals.length;
+    const bonusesEarned = user.referralBonusesClaimed;
+    const nextBonusThreshold = (bonusesEarned + 1) * 10;
+    
+    // If user can claim a bonus
+    if (currentReferrals >= nextBonusThreshold) {
+      // Add the bonus points
+      user.addEarnings(BONUS_AMOUNT);
+      user.referralBonusesClaimed++;
+      await user.save();
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Congratulations! Referral bonus claimed successfully',
+        bonusAmount: BONUS_AMOUNT,
+        newBalance: user.balance,
+        totalReferrals: currentReferrals,
+        nextBonusAt: (user.referralBonusesClaimed + 1) * 10,
+        bonusesClaimed: user.referralBonusesClaimed
+      });
+    }
+    
+    // If user has claimed previous bonus but needs more referrals
+    const remainingReferrals = nextBonusThreshold - currentReferrals;
+    
+    return res.status(200).json({
+      status: 'pending',
+      message: `Invite ${remainingReferrals} more friend${remainingReferrals === 1 ? '' : 's'} to claim your next bonus!`,
+      currentReferrals: currentReferrals,
+      nextBonusAt: nextBonusThreshold,
+      remainingReferrals: remainingReferrals,
+      bonusesClaimed: bonusesEarned,
+      bonusAmount: BONUS_AMOUNT,
+      progress: {
+        current: currentReferrals,
+        target: nextBonusThreshold,
+        percentage: Math.floor((currentReferrals / nextBonusThreshold) * 100)
+      }
+    });
+    
+  } catch (error) {
+    handleError(res, error);
+  }
+};
