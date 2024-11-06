@@ -36,7 +36,7 @@ router.put('/users/:telegramUserId/role', userController.getRoleDetails);
 router.put('/wallet-address', userController.updateWalletAddress);
 router.get('/wallet-address', userController.getWalletAddress);
 router.get('/all-users', userController.getAllUsersWithWallets);
-
+router.post('/users/:telegramUserId/claim-referral-bonus', userController.claimReferralBonus);
 
 
 // Leaderboard routes
@@ -44,6 +44,7 @@ router.get('/leaderboard', leaderboardController.getLeaderboard);
 router.get('/getUsers', leaderboardController.getAllUsers);
 router.get('/rank/:username', leaderboardController.getUserRank);
 router.post('/claim-hourly-points', leaderboardController.claimHourlyPoints);
+
 
 // New game route
 router.post('/play-game', userController.playGame);
