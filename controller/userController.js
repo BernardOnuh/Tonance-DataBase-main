@@ -680,34 +680,35 @@ exports.createPromoCode = async (req, res) => {
 exports.claimReferralBonus = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
-    
     const user = await User.findOne({ telegramUserId })
       .populate('referrals');
-    
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    if (user.hasClaimedReferralBonus) {
-      return res.status(400).json({ 
-        message: 'Referral bonus has already been claimed'
+      return res.status(404).json({ 
+        message: 'User not found' 
       });
     }
-    
-    if (user.referrals.length < 10) {
+
+    if (user.hasClaimedReferralBonus) {
       return res.status(400).json({ 
+        message: 'Referral bonus has already been claimed' 
+      });
+    }
+
+    // Simple check for 10 referrals
+    if (user.referrals.length < 10) {
+      return res.status(400).json({
         message: `You need ${10 - user.referrals.length} more referrals to claim this bonus`,
         currentReferrals: user.referrals.length,
         requiredReferrals: 10
       });
     }
-    
-    // Add the bonus points
+
     const REFERRAL_BONUS = 1000000;
     user.addEarnings(REFERRAL_BONUS);
     user.hasClaimedReferralBonus = true;
     await user.save();
-    
+
     res.status(200).json({
       message: 'Referral bonus claimed successfully',
       bonusAmount: REFERRAL_BONUS,
@@ -722,55 +723,50 @@ exports.claimReferralBonus = async (req, res) => {
 exports.checkReferralBonusStatus = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
-    
     const user = await User.findOne({ telegramUserId })
       .populate('referrals');
-    
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ 
+        message: 'User not found' 
+      });
     }
-    
+
+    const REQUIRED_REFERRALS = 10;
     const BONUS_AMOUNT = 1000000;
     const currentReferrals = user.referrals.length;
-    const bonusesEarned = user.referralBonusesClaimed;
-    const nextBonusThreshold = (bonusesEarned + 1) * 10;
-    
-    // If user can claim a bonus
-    if (currentReferrals >= nextBonusThreshold) {
-      // Add the bonus points
+
+    // If user has enough referrals and hasn't claimed bonus yet
+    if (currentReferrals >= REQUIRED_REFERRALS && !user.hasClaimedReferralBonus) {
       user.addEarnings(BONUS_AMOUNT);
-      user.referralBonusesClaimed++;
+      user.hasClaimedReferralBonus = true;
       await user.save();
-      
+
       return res.status(200).json({
         status: 'success',
         message: 'Congratulations! Referral bonus claimed successfully',
         bonusAmount: BONUS_AMOUNT,
         newBalance: user.balance,
-        totalReferrals: currentReferrals,
-        nextBonusAt: (user.referralBonusesClaimed + 1) * 10,
-        bonusesClaimed: user.referralBonusesClaimed
+        totalReferrals: currentReferrals
       });
     }
-    
-    // If user has claimed previous bonus but needs more referrals
-    const remainingReferrals = nextBonusThreshold - currentReferrals;
-    
+
+    // If user hasn't reached 10 referrals yet
+    const remainingReferrals = REQUIRED_REFERRALS - currentReferrals;
     return res.status(200).json({
       status: 'pending',
-      message: `Invite ${remainingReferrals} more friend${remainingReferrals === 1 ? '' : 's'} to claim your next bonus!`,
+      message: `Invite ${remainingReferrals} more friend${remainingReferrals === 1 ? '' : 's'} to claim your bonus!`,
       currentReferrals: currentReferrals,
-      nextBonusAt: nextBonusThreshold,
+      targetReferrals: REQUIRED_REFERRALS,
       remainingReferrals: remainingReferrals,
-      bonusesClaimed: bonusesEarned,
       bonusAmount: BONUS_AMOUNT,
       progress: {
         current: currentReferrals,
-        target: nextBonusThreshold,
-        percentage: Math.floor((currentReferrals / nextBonusThreshold) * 100)
+        target: REQUIRED_REFERRALS,
+        percentage: Math.floor((currentReferrals / REQUIRED_REFERRALS) * 100)
       }
     });
-    
+
   } catch (error) {
     handleError(res, error);
   }
