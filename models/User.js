@@ -45,6 +45,10 @@ const UserSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  hasClaimedReferralBonus: {
+    type: Boolean,
+    default: false
+  },
   username: {
     type: String,
     required: true,
@@ -137,7 +141,9 @@ UserSchema.methods.startEarning = function() {
   }
   return false;
 };
-
+UserSchema.methods.canClaimReferralBonus = function() {
+  return this.referrals.length >= 10 && !this.hasClaimedReferralBonus;
+};
 UserSchema.methods.stopEarning = function() {
   if (this.isEarning) {
     this.isEarning = false;

@@ -135,3 +135,45 @@ exports.addReferral = async (userId) => {
     console.error('Error adding referral:', error);
   }
 };
+
+exports.claimReferralBonus = async (req, res) => {
+  try {
+    const { telegramUserId } = req.params;
+    
+    const user = await User.findOne({ telegramUserId })
+      .populate('referrals');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.hasClaimedReferralBonus) {
+      return res.status(400).json({ 
+        message: 'Referral bonus has already been claimed'
+      });
+    }
+    
+    if (user.referrals.length < 10) {
+      return res.status(400).json({ 
+        message: `You need ${10 - user.referrals.length} more referrals to claim this bonus`,
+        currentReferrals: user.referrals.length,
+        requiredReferrals: 10
+      });
+    }
+    
+    // Add the bonus points
+    const REFERRAL_BONUS = 1000000;
+    user.addEarnings(REFERRAL_BONUS);
+    user.hasClaimedReferralBonus = true;
+    await user.save();
+    
+    res.status(200).json({
+      message: 'Referral bonus claimed successfully',
+      bonusAmount: REFERRAL_BONUS,
+      newBalance: user.balance,
+      totalReferrals: user.referrals.length
+    });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
