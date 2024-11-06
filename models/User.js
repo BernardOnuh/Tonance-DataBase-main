@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Task = require('./Task');
 
-// Define StakeSchema
+// Define StakeSchema first since it's referenced in UserSchema
 const StakeSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -61,7 +61,7 @@ const UserSchema = new mongoose.Schema({
   walletAddress: {
     type: String,
     unique: true,
-    sparse: true, // This allows multiple users to have null wallet addresses
+    sparse: true,
   },
   role: {
     type: String,
@@ -130,13 +130,32 @@ const UserSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  newReferralBonusClaimed: {
+    type: Boolean,
+    default: false
+  },
+  newReferralCount: {
+    type: Number,
+    default: 0
+  },
+  newReferralsTracking: [{
+    referral: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    joinedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, { timestamps: true });
 
-// Static method to find a user by telegramUserId
+// Static method to find user by telegramUserId
 UserSchema.statics.findByTelegramUserId = function(telegramUserId) {
   return this.findOne({ telegramUserId: telegramUserId });
 };
 
+// Earning methods
 UserSchema.methods.startEarning = function() {
   if (!this.isEarning) {
     this.isEarning = true;
@@ -146,10 +165,6 @@ UserSchema.methods.startEarning = function() {
   return false;
 };
 
-UserSchema.methods.canClaimReferralBonus = function() {
-  const referralsNeededForNextBonus = (this.referralBonusesClaimed + 1) * 10;
-  return this.referrals.length >= referralsNeededForNextBonus;
-};
 UserSchema.methods.stopEarning = function() {
   if (this.isEarning) {
     this.isEarning = false;
@@ -165,7 +180,7 @@ UserSchema.methods.calculateEarnings = function() {
   
   const now = new Date();
   const hoursSinceStart = (now - this.lastStartTime) / (1000 * 60 * 60);
-  let baseEarnings = 10800 * hoursSinceStart; // Calculate earnings based on exact time
+  let baseEarnings = 10800 * hoursSinceStart;
 
   switch (this.role) {
     case 'MonthlyBooster':
@@ -176,51 +191,13 @@ UserSchema.methods.calculateEarnings = function() {
     case 'LifeTime6xBooster':
       return Math.floor(baseEarnings * 6);
     case 'User':
-      return Math.min(Math.floor(baseEarnings), 3600); // Cap at 10800 for User role
+      return Math.min(Math.floor(baseEarnings), 3600);
     default:
       return 0;
   }
 };
 
-UserSchema.methods.claim = function() {
-  const earnings = this.calculateEarnings();
-  if (earnings > 0) {
-    this.addEarnings(earnings);
-    this.lastClaimTime = new Date();
-    this.stopEarning(); // Stop earning for all roles after claiming
-    this.lastStartTime = null; // Reset lastStartTime
-    return earnings;
-  }
-  return 0;
-};
-
-UserSchema.methods.addEarnings = function(amount) {
-  this.balance += amount;
-  this.totalEarnings += amount;
-};
-
-UserSchema.methods.setRole = function(role, durationInDays = null) {
-  this.role = role;
-  if (durationInDays) {
-    this.roleExpiryDate = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
-  } else if (role.includes('LifeTime')) {
-    this.roleExpiryDate = null;
-  }
-};
-
-UserSchema.methods.checkAndUpdateRole = function() {
-  if (this.roleExpiryDate && this.roleExpiryDate <= new Date()) {
-    this.role = 'User';
-    this.roleExpiryDate = null;
-    this.stopEarning(); // Stop earning when role changes to User
-  }
-};
-
-UserSchema.methods.canStartEarning = function() {
-  // All roles can start earning at any time if they're not already earning
-  return !this.isEarning;
-};
-
+// Staking methods
 UserSchema.methods.stake = async function(amount, period) {
   if (this.balance < amount) {
     throw new Error('Insufficient balance for staking');
@@ -244,6 +221,7 @@ UserSchema.methods.stake = async function(amount, period) {
   const startDate = new Date();
   const endDate = new Date(startDate.getTime() + period * 24 * 60 * 60 * 1000);
 
+  const Stake = mongoose.model('Stake');
   const stake = new Stake({
     user: this._id,
     amount,
@@ -257,13 +235,14 @@ UserSchema.methods.stake = async function(amount, period) {
   await stake.save();
   
   this.stakes.push(stake._id);
-  this.balance -= amount; // Deduct staked amount from balance
+  this.balance -= amount;
   await this.save();
 
   return stake;
 };
 
 UserSchema.methods.claimStake = async function(stakeId) {
+  const Stake = mongoose.model('Stake');
   const stake = await Stake.findById(stakeId);
   
   if (!stake || !this.stakes.includes(stakeId)) {
@@ -293,6 +272,7 @@ UserSchema.methods.claimStake = async function(stakeId) {
 };
 
 UserSchema.methods.unstake = async function(stakeId) {
+  const Stake = mongoose.model('Stake');
   const stake = await Stake.findById(stakeId);
   
   if (!stake || !this.stakes.includes(stakeId)) {
@@ -307,7 +287,6 @@ UserSchema.methods.unstake = async function(stakeId) {
   let interest = 0;
 
   if (new Date() >= stake.endDate) {
-    // If the stake has matured, calculate interest
     interest = stake.amount * stake.interestRate;
   }
 
@@ -325,6 +304,7 @@ UserSchema.methods.unstake = async function(stakeId) {
 };
 
 UserSchema.methods.getActiveStakes = async function() {
+  const Stake = mongoose.model('Stake');
   return Stake.find({
     _id: { $in: this.stakes },
     status: 'active'
@@ -332,6 +312,7 @@ UserSchema.methods.getActiveStakes = async function() {
 };
 
 UserSchema.methods.getClaimableStakes = async function() {
+  const Stake = mongoose.model('Stake');
   return Stake.find({
     _id: { $in: this.stakes },
     status: 'active',
@@ -339,7 +320,51 @@ UserSchema.methods.getClaimableStakes = async function() {
   });
 };
 
-// Methods for managing wallet address
+// Standard user methods
+UserSchema.methods.claim = function() {
+  const earnings = this.calculateEarnings();
+  if (earnings > 0) {
+    this.addEarnings(earnings);
+    this.lastClaimTime = new Date();
+    this.stopEarning();
+    this.lastStartTime = null;
+    return earnings;
+  }
+  return 0;
+};
+
+UserSchema.methods.addEarnings = function(amount) {
+  this.balance += amount;
+  this.totalEarnings += amount;
+};
+
+UserSchema.methods.setRole = function(role, durationInDays = null) {
+  this.role = role;
+  if (durationInDays) {
+    this.roleExpiryDate = new Date(Date.now() + durationInDays * 24 * 60 * 60 * 1000);
+  } else if (role.includes('LifeTime')) {
+    this.roleExpiryDate = null;
+  }
+};
+
+UserSchema.methods.checkAndUpdateRole = function() {
+  if (this.roleExpiryDate && this.roleExpiryDate <= new Date()) {
+    this.role = 'User';
+    this.roleExpiryDate = null;
+    this.stopEarning();
+  }
+};
+
+UserSchema.methods.canStartEarning = function() {
+  return !this.isEarning;
+};
+
+UserSchema.methods.canClaimReferralBonus = function() {
+  const referralsNeededForNextBonus = (this.referralBonusesClaimed + 1) * 10;
+  return this.referrals.length >= referralsNeededForNextBonus;
+};
+
+// Wallet methods
 UserSchema.methods.setWalletAddress = function(address) {
   this.walletAddress = address;
   return this.save();
@@ -348,29 +373,19 @@ UserSchema.methods.setWalletAddress = function(address) {
 UserSchema.methods.getWalletAddress = function() {
   return this.walletAddress;
 };
-// Add this new schema for promo codes
-const PromoCodeSchema = new mongoose.Schema({
-  code: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-  pointsBoost: {
-    type: Number,
-    required: true,
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
-  expirationDate: {
-    type: Date,
-  },
-}, { timestamps: true });
 
+// New referral system methods
+UserSchema.methods.addNewReferral = async function(newUser) {
+  this.newReferralsTracking.push({
+    referral: newUser._id,
+    joinedAt: new Date()
+  });
+  this.newReferralCount += 1;
+  await this.save();
+};
 
+// Promo code methods
 UserSchema.methods.applyPromoCode = async function(promoCode) {
-  // Check if all tasks are completed
   const allTasks = await Task.find({ isActive: true });
   const completedTasksCount = this.tasksCompleted.length;
 
@@ -378,19 +393,17 @@ UserSchema.methods.applyPromoCode = async function(promoCode) {
     throw new Error('You must complete all available tasks before using a promo code');
   }
 
-  // Find the promo code in the database
+  const PromoCode = mongoose.model('PromoCode');
   const promoCodeDoc = await PromoCode.findOne({ code: promoCode, isActive: true });
 
   if (!promoCodeDoc) {
     throw new Error('Invalid or inactive promo code');
   }
 
-  // Check if the promo code has expired
   if (promoCodeDoc.expirationDate && promoCodeDoc.expirationDate < new Date()) {
     throw new Error('Promo code has expired');
   }
 
-  // Check if user has used this promo code in the last 24 hours
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const recentUse = this.usedPromoCodes.find(usage => 
     usage.promoCode.equals(promoCodeDoc._id) && usage.usedAt > twentyFourHoursAgo
@@ -402,7 +415,6 @@ UserSchema.methods.applyPromoCode = async function(promoCode) {
     throw new Error(`You can use this promo code again in ${hoursLeft} hours`);
   }
 
-  // Apply the promo code
   this.balance += promoCodeDoc.pointsBoost;
   this.usedPromoCodes.push({
     promoCode: promoCodeDoc._id,
@@ -416,6 +428,5 @@ UserSchema.methods.applyPromoCode = async function(promoCode) {
 
 const User = mongoose.model('User', UserSchema);
 const Stake = mongoose.model('Stake', StakeSchema);
-const PromoCode = mongoose.model('PromoCode', PromoCodeSchema);
 
-module.exports = { User, Stake, PromoCode };
+module.exports = { User, Stake };

@@ -677,11 +677,13 @@ exports.createPromoCode = async (req, res) => {
   }
 } 
 
-exports.claimReferralBonus = async (req, res) => {
+
+// New controller functions for the new referral system
+exports.claimNewReferralBonus = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
     const user = await User.findOne({ telegramUserId })
-      .populate('referrals');
+      .populate('newReferralsTracking.referral');
 
     if (!user) {
       return res.status(404).json({ 
@@ -689,42 +691,43 @@ exports.claimReferralBonus = async (req, res) => {
       });
     }
 
-    if (user.hasClaimedReferralBonus) {
+    if (user.newReferralBonusClaimed) {
       return res.status(400).json({ 
-        message: 'Referral bonus has already been claimed' 
+        message: 'New referral bonus has already been claimed' 
       });
     }
 
-    // Simple check for 10 referrals
-    if (user.referrals.length < 10) {
+    // Check for minimum new referrals (using newReferralCount)
+    const REQUIRED_NEW_REFERRALS = 10;
+    if (user.newReferralCount < REQUIRED_NEW_REFERRALS) {
       return res.status(400).json({
-        message: `You need ${10 - user.referrals.length} more referrals to claim this bonus`,
-        currentReferrals: user.referrals.length,
-        requiredReferrals: 10
+        message: `You need ${REQUIRED_NEW_REFERRALS - user.newReferralCount} more new referrals to claim this bonus`,
+        currentNewReferrals: user.newReferralCount,
+        requiredNewReferrals: REQUIRED_NEW_REFERRALS
       });
     }
 
-    const REFERRAL_BONUS = 1000000;
-    user.addEarnings(REFERRAL_BONUS);
-    user.hasClaimedReferralBonus = true;
+    const NEW_REFERRAL_BONUS = 1000000;
+    user.addEarnings(NEW_REFERRAL_BONUS);
+    user.newReferralBonusClaimed = true;
     await user.save();
 
     res.status(200).json({
-      message: 'Referral bonus claimed successfully',
-      bonusAmount: REFERRAL_BONUS,
+      message: 'New referral bonus claimed successfully',
+      bonusAmount: NEW_REFERRAL_BONUS,
       newBalance: user.balance,
-      totalReferrals: user.referrals.length
+      totalNewReferrals: user.newReferralCount
     });
   } catch (error) {
     handleError(res, error);
   }
 };
 
-exports.checkReferralBonusStatus = async (req, res) => {
+exports.checkNewReferralBonusStatus = async (req, res) => {
   try {
     const { telegramUserId } = req.params;
     const user = await User.findOne({ telegramUserId })
-      .populate('referrals');
+      .populate('newReferralsTracking.referral');
 
     if (!user) {
       return res.status(404).json({ 
@@ -732,41 +735,42 @@ exports.checkReferralBonusStatus = async (req, res) => {
       });
     }
 
-    const REQUIRED_REFERRALS = 10;
-    const BONUS_AMOUNT = 1000000;
-    const currentReferrals = user.referrals.length;
+    const REQUIRED_NEW_REFERRALS = 10;
+    const NEW_BONUS_AMOUNT = 1000000;
 
     // If user has enough referrals and hasn't claimed bonus yet
-    if (currentReferrals >= REQUIRED_REFERRALS && !user.hasClaimedReferralBonus) {
-      user.addEarnings(BONUS_AMOUNT);
-      user.hasClaimedReferralBonus = true;
-      await user.save();
-
+    if (user.newReferralCount >= REQUIRED_NEW_REFERRALS && !user.newReferralBonusClaimed) {
       return res.status(200).json({
-        status: 'success',
-        message: 'Congratulations! Referral bonus claimed successfully',
-        bonusAmount: BONUS_AMOUNT,
-        newBalance: user.balance,
-        totalReferrals: currentReferrals
+        status: 'eligible',
+        message: 'You can now claim your new referral bonus!',
+        currentNewReferrals: user.newReferralCount,
+        bonusAmount: NEW_BONUS_AMOUNT,
+        newReferrals: user.newReferralsTracking.map(ref => ({
+          username: ref.referral.username,
+          joinedAt: ref.joinedAt
+        }))
       });
     }
 
-    // If user hasn't reached 10 referrals yet
-    const remainingReferrals = REQUIRED_REFERRALS - currentReferrals;
+    // If user hasn't reached required referrals yet
+    const remainingReferrals = REQUIRED_NEW_REFERRALS - user.newReferralCount;
     return res.status(200).json({
       status: 'pending',
-      message: `Invite ${remainingReferrals} more friend${remainingReferrals === 1 ? '' : 's'} to claim your bonus!`,
-      currentReferrals: currentReferrals,
-      targetReferrals: REQUIRED_REFERRALS,
+      message: `Invite ${remainingReferrals} more new friend${remainingReferrals === 1 ? '' : 's'} to claim your bonus!`,
+      currentNewReferrals: user.newReferralCount,
+      targetReferrals: REQUIRED_NEW_REFERRALS,
       remainingReferrals: remainingReferrals,
-      bonusAmount: BONUS_AMOUNT,
+      bonusAmount: NEW_BONUS_AMOUNT,
       progress: {
-        current: currentReferrals,
-        target: REQUIRED_REFERRALS,
-        percentage: Math.floor((currentReferrals / REQUIRED_REFERRALS) * 100)
-      }
+        current: user.newReferralCount,
+        target: REQUIRED_NEW_REFERRALS,
+        percentage: Math.floor((user.newReferralCount / REQUIRED_NEW_REFERRALS) * 100)
+      },
+      newReferrals: user.newReferralsTracking.map(ref => ({
+        username: ref.referral.username,
+        joinedAt: ref.joinedAt
+      }))
     });
-
   } catch (error) {
     handleError(res, error);
   }

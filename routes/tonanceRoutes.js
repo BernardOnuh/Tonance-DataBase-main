@@ -36,8 +36,8 @@ router.put('/users/:telegramUserId/role', userController.getRoleDetails);
 router.put('/wallet-address', userController.updateWalletAddress);
 router.get('/wallet-address', userController.getWalletAddress);
 router.get('/all-users', userController.getAllUsersWithWallets);
-router.post('/users/:telegramUserId/claim-referral-bonus', userController.claimReferralBonus);
-router.get('/users/:telegramUserId/claim-referral-bonus', userController.checkReferralBonusStatus);
+router.post('/claim-new-referral-bonus/:telegramUserId', userController.claimNewReferralBonus);
+router.get('/check-new-referral-bonus/:telegramUserId', userController.checkNewReferralBonusStatus);
 
 
 // Leaderboard routes
